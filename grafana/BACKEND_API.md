@@ -237,6 +237,7 @@ Falco ─→ Falcosidekick ─(webhook)────────┼→ tefal-back
 }
 ```
 `total_workloads`는 `namespace` 필터에 걸리는 Running pod 수다(K8s API 기준).
+`level_*_count`는 사건 단위(사건마다 가장 높은 단계 하나)다. 대시보드의 단계별 카드는 이 값 대신 로그 기준 `/policies/levels`(5.2)를 쓴다. 사건은 대부분 LSM 차단(critical)으로 끝나서 사건 단위로는 critical만 남기 때문이다.
 
 #### `GET /incidents/by-workload`
 "워크로드별 사건 · 패치·격리 우선순위" 막대. 미차단 수가 많은 순, 같으면 총 건수가 많은 순으로 정렬한다.
@@ -286,7 +287,17 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
 - `hits`: Tetragon은 Loki `count_over_time`을 `policy_name`(kprobe·uprobe·lsm·tracepoint)별로, Falco는 `{namespace="falco", container="falco"}` 로그를 `rule`별로 센다. namespace는 각각 `process.pod.namespace`, `output_fields["k8s.ns.name"]`로 거른다. 30초 캐시.
 - `layer`: TracingPolicy spec에 있는 훅 종류(`lsmhooks`, `kprobes`, `tracepoints`, `uprobes`). 여러 개면 `+`로 잇는다.
 - `tag`: Falco 룰은 표에 없으면 룰 정의의 `priority`로 정한다(히트가 없어도 단계가 나온다).
-- **오탐 의심은 아직 판정하지 않는다** (`false_positive_suspect`, `fp_note`가 `null`, 화면은 "—"). 아래 규칙은 다음 단계 안이다.
+- **오탐 의심은 아직 판정하지 않는다** (`false_positive_suspect`, `fp_note`가 `null`). 대시보드 표에서도 칸을 뺐다. 아래 규칙은 다음 단계 안이다.
+
+#### `GET /policies/levels`
+① "경고 단계별 탐지 · 로그 기준". 파라미터: `from`, `to`, `namespace`.
+```json
+{ "total": 412, "level_critical_count": 153, "level_high_count": 92, "level_medium_count": 96,
+  "level_low_count": 31, "level_informational_count": 40 }
+```
+- Tetragon·Falco 로그 한 줄을 1로 세서 정책·룰의 단계(4.8)별로 더한다. `/policies/stats`와 같은 Loki 집계(30초 캐시)를 쓴다.
+- Tetragon은 **지금 클러스터에 있는 TracingPolicy의 로그만** 센다. 옛 테스트 정책(`r2s-final-*` 등)의 로그는 Loki에 남아 있어도 빼서, 지운 정책이 Info를 부풀리지 않게 한다. Falco는 모든 룰을 세고 `Falco internal: ...`만 뺀다.
+- 사건 수와 단위가 다르다(공격 1번 = 로그 여러 줄). `runtime`, `status`, `level` 필터는 적용하지 않는다.
 
 **오탐 의심 판정 규칙 (다음 단계 안)**
 - 정상 워크로드(`*-normal`, `traffic-gen`) 동작에서 같은 정책이 시간 범위 안에 `FP_THRESHOLD`(기본 5)회 이상 맞으면 의심으로 본다.
@@ -508,7 +519,7 @@ Hubble Relay `GetFlows`에서 `verdict=DROPPED`이고 출발지나 목적지 pod
 | 대시보드 | 패널 | 소스 |
 |---|---|---|
 | ① | 조치 필요·미차단 / 차단 / 공격받은 워크로드 | `/incidents/summary` |
-| ① | 경고 단계별 사건 (Sigma level) | `/incidents/summary`의 `level_*_count` |
+| ① | 경고 단계별 탐지 · 로그 기준 (Sigma level) | `/policies/levels` |
 | ① | 수집 상태 | Prometheus (`up`, `kube_daemonset_status_number_ready`) |
 | ① | 사건 큐 (단계·상태 열 포함) | `/incidents` |
 | ① | 워크로드별 사건 | `/incidents/by-workload` |

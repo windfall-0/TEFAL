@@ -617,8 +617,8 @@
     {
       "id": 5,
       "type": "stat",
-      "title": "경고 단계별 사건 · Sigma level",
-      "description": "사건 단계 = 묶인 이벤트(Tetragon 정책·Falco 룰)의 Sigma level 중 가장 높은 값. 매칭 표는 tefal-backend의 sigma_levels.yaml.",
+      "title": "경고 단계별 탐지 · 로그 기준 (Sigma level)",
+      "description": "Tetragon·Falco 로그 한 줄을 1로 세서 정책·룰의 Sigma level별로 더한 값입니다. 공격 1번에 로그가 여러 줄 나오므로 사건 수와 단위가 다릅니다(사건별 단계는 사건 큐의 '단계' 열). namespace·시간 범위만 적용되고 런타임·상태·단계 필터는 적용되지 않습니다. Tetragon은 지금 클러스터에 적용된 정책의 로그만 셉니다. 매칭 표는 tefal-backend의 sigma_levels.yaml, 표에 없는 정책·룰은 Info.",
       "gridPos": {
         "x": 0,
         "y": 5,
@@ -640,7 +640,7 @@
           "source": "url",
           "parser": "backend",
           "format": "table",
-          "url": "/incidents/summary?from=${__from}&to=${__to}&namespace=${namespace}&runtime=${runtime:csv}&status=${status}&level=${level:csv}",
+          "url": "/policies/levels?from=${__from}&to=${__to}&namespace=${namespace}",
           "url_options": {
             "method": "GET",
             "data": ""
@@ -791,7 +791,21 @@
             ]
           }
         ]
-      }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "Critical": 0,
+              "High": 1,
+              "Medium": 2,
+              "Low": 3,
+              "Info": 4
+            }
+          }
+        }
+      ]
     },
     {
       "id": 6,

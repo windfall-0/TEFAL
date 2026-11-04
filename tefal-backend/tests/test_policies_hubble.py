@@ -76,6 +76,21 @@ def test_policies_stats_api(client, app, auth, respx_mock):
     assert all(r["fp_note"] is None for r in rows)
 
 
+@respx.mock(assert_all_called=False)
+def test_policies_levels_api(client, app, auth, respx_mock, settings):
+    respx_mock.route(host="testserver").pass_through()
+    respx_mock.get("http://loki.test:3100/loki/api/v1/query").mock(side_effect=_loki)
+    with open(settings.sigma_levels_file, "w", encoding="utf-8") as fh:
+        fh.write("tetragon:\n  php2shell-lsm-bprmcheck-block: critical\nfalco: {}\n")
+    _fake(app)
+    r = client.get("/policies/levels", params={"from": 0, "to": 3_600_000, "namespace": "vuln-lab"},
+                   headers=auth).json()
+    # Tetragon: 지금 있는 정책 59 → critical, 클러스터에 없는 옛 정책 3건은 세지 않는다
+    # Falco: 룰 B(priority Warning → medium) 4, 기본 룰 Notice 1 → low
+    assert r["level_critical_count"] == 59 and r["level_informational_count"] == 0
+    assert r["level_medium_count"] == 4 and r["level_low_count"] == 1 and r["total"] == 59 + 4 + 1
+
+
 def test_policies_stats_loki_error(client, app, auth):
     _fake(app)
     with respx.mock(assert_all_called=False) as m:

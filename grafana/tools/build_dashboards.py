@@ -240,14 +240,20 @@ def overview():
                     "thresholds": thresholds((None, RED), (1, GREEN))},
           desc="DaemonSet Ready 비율과 Alloy/Loki/Tempo scrape 상태. 1이면 정상입니다.")
 
-    b.add("stat", "경고 단계별 사건 · Sigma level", 0, 5, 24, 4,
-          [inf(summary_url, [("level_" + k + "_count", t, "number") for k, t, _ in LEVELS])],
+    b.add("stat", "경고 단계별 탐지 · 로그 기준 (Sigma level)", 0, 5, 24, 4,
+          [inf("/policies/levels?" + TR + "&namespace=${namespace}",
+               [("level_" + k + "_count", t, "number") for k, t, _ in LEVELS])],
           DS_B, stat_opts(size=(14, 32), orient="vertical", color="background"),
           defaults={"unit": "none", "noValue": "0", "color": fixed(GREY),
                     "thresholds": thresholds((None, GREY))},
           overrides=[ov(t, color=fixed(c)) for _, t, c in LEVELS],
-          desc="사건 단계 = 묶인 이벤트(Tetragon 정책·Falco 룰)의 Sigma level 중 가장 높은 값. "
-               "매칭 표는 tefal-backend의 sigma_levels.yaml.")
+          # Infinity가 열을 알파벳순으로 바꾸므로 높은 단계부터 순서를 고정한다
+          transformations=[{"id": "organize", "options": {"indexByName": {t: i for i, (_, t, _) in enumerate(LEVELS)}}}],
+          desc="Tetragon·Falco 로그 한 줄을 1로 세서 정책·룰의 Sigma level별로 더한 값입니다. "
+               "공격 1번에 로그가 여러 줄 나오므로 사건 수와 단위가 다릅니다(사건별 단계는 사건 큐의 '단계' 열). "
+               "namespace·시간 범위만 적용되고 런타임·상태·단계 필터는 적용되지 않습니다. "
+               "Tetragon은 지금 클러스터에 적용된 정책의 로그만 셉니다. "
+               "매칭 표는 tefal-backend의 sigma_levels.yaml, 표에 없는 정책·룰은 Info.")
 
     queue_cols = [
         ("time", "시각", "string"), ("level", "단계", "string"), ("status", "상태", "string"),
