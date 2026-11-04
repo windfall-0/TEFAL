@@ -313,19 +313,14 @@ def overview():
     b.add("table", "정책 상태 · 방어가 제대로 도는가", 0, 27, 24, 9,
           [inf("/policies/stats?" + TR + "&namespace=${namespace}",
                [("policy", "정책", "string"), ("tag", "구분", "string"), ("layer", "계층", "string"),
-                ("action", "액션", "string"), ("hits", "히트", "number"),
-                ("fp_note", "오탐 의심", "string")])],
+                ("action", "액션", "string"), ("hits", "히트", "number")])],
           DS_B, table_opts(),
           defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}}},
           overrides=[
               ov("구분", custom__width=110), ov("계층", custom__width=170), ov("액션", custom__width=130),
               ov("히트", custom__width=70, custom__align="right"),
-              ov("오탐 의심", color=fixed(ORANGE), custom__cellOptions={"type": "color-text"},
-                 mappings=[{"type": "special", "options": {"match": "empty", "result": {"text": "—", "color": GREY, "index": 0}}},
-                           {"type": "special", "options": {"match": "null", "result": {"text": "—", "color": GREY, "index": 1}}},
-                           {"type": "regex", "options": {"pattern": "(.+)", "result": {"text": "▲ $1", "index": 2}}}]),
           ],
-          desc="오탐 의심 = 정상 워크로드 동작에서 같은 정책이 반복해서 맞는 경우")
+          desc="정책별 시간 범위 안 히트 수 (Tetragon·Falco 로그 기준). 구분 = 경고 단계")
 
     variables = [
         {"type": "query", "name": "namespace", "label": "namespace", "hide": 0, "datasource": DS_P,

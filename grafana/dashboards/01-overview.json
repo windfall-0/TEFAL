@@ -1449,7 +1449,7 @@
       "id": 9,
       "type": "table",
       "title": "정책 상태 · 방어가 제대로 도는가",
-      "description": "오탐 의심 = 정상 워크로드 동작에서 같은 정책이 반복해서 맞는 경우",
+      "description": "정책별 시간 범위 안 히트 수 (Tetragon·Falco 로그 기준). 구분 = 경고 단계",
       "gridPos": {
         "x": 0,
         "y": 27,
@@ -1502,11 +1502,6 @@
               "selector": "hits",
               "text": "히트",
               "type": "number"
-            },
-            {
-              "selector": "fp_note",
-              "text": "오탐 의심",
-              "type": "string"
             }
           ],
           "filters": []
@@ -1580,64 +1575,6 @@
                 "value": "right"
               }
             ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "오탐 의심"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "#FFB357"
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "special",
-                    "options": {
-                      "match": "empty",
-                      "result": {
-                        "text": "—",
-                        "color": "#8E8E8E",
-                        "index": 0
-                      }
-                    }
-                  },
-                  {
-                    "type": "special",
-                    "options": {
-                      "match": "null",
-                      "result": {
-                        "text": "—",
-                        "color": "#8E8E8E",
-                        "index": 1
-                      }
-                    }
-                  },
-                  {
-                    "type": "regex",
-                    "options": {
-                      "pattern": "(.+)",
-                      "result": {
-                        "text": "▲ $1",
-                        "index": 2
-                      }
-                    }
-                  }
-                ]
-              }
-            ]
           }
         ]
       },
@@ -1650,8 +1587,7 @@
               "구분": 1,
               "계층": 2,
               "액션": 3,
-              "히트": 4,
-              "오탐 의심": 5
+              "히트": 4
             }
           }
         }
