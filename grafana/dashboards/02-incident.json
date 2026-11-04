@@ -347,7 +347,7 @@
               "type": "string"
             },
             {
-              "selector": "src_ip",
+              "selector": "src_ip_text",
               "text": "출발지 IP",
               "type": "string"
             }
@@ -586,6 +586,11 @@
             {
               "selector": "vt_text",
               "text": "VirusTotal",
+              "type": "string"
+            },
+            {
+              "selector": "notice",
+              "text": "안내",
               "type": "string"
             }
           ],

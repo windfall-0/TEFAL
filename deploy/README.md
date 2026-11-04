@@ -76,6 +76,24 @@ kubectl rollout restart deploy/tefal-backend -n monitoring   # 코드만 바뀐 
   - Role `falco/tefal-backend-falco-rules`: ConfigMap `falco-rules` `get`
   - 확인: `kubectl auth can-i list pods --as=system:serviceaccount:monitoring:tefal-backend` → yes, `get secrets`·`list configmaps`·`create pods`·`create pods/exec` → no
 
+### 5단계 키와 GeoLite DB (처음 한 번)
+
+```bash
+# API 키: 기존 Secret에 더한다. 값은 셸에서 직접 넣고 출력하지 않는다 ('EOF'로 $ 확장 막기)
+kubectl -n monitoring patch secret tefal-backend-token --type merge -p "$(cat <<'EOF'
+{"stringData": {"ABUSEIPDB_API_KEY": "...", "VIRUSTOTAL_API_KEY": "...", "GEMINI_API_KEY": "..."}}
+EOF
+)"
+# GeoLite2 City·ASN mmdb: 수십 MB라 Secret·ConfigMap 대신 백엔드 PVC(/data)에 둔다
+P=$(kubectl -n monitoring get pod -l app.kubernetes.io/name=tefal-backend -o jsonpath="{.items[0].metadata.name}")
+kubectl -n monitoring cp GeoLite2-City.mmdb $P:/data/GeoLite2-City.mmdb -c tefal-backend
+kubectl -n monitoring cp GeoLite2-ASN.mmdb  $P:/data/GeoLite2-ASN.mmdb  -c tefal-backend
+kubectl rollout restart deploy/tefal-backend -n monitoring
+```
+
+- 키 이름만 확인: `kubectl -n monitoring get secret tefal-backend-token -o jsonpath='{.data}' | grep -o '"[A-Z_]*"'`
+- Gemini 모델은 `gen_backend.py`의 `GEMINI_MODEL`.
+
 ### 경고 단계 표 수정
 
 `tefal-backend/config/sigma_levels.yaml`을 고치고 생성기를 다시 돌린 뒤 `kubectl apply -f 15-sigma-configmap.json`.

@@ -260,10 +260,11 @@ def overview():
         ("time", "시각", "string"), ("level", "단계", "string"), ("status", "상태", "string"),
         ("workload", "namespace / pod", "string"), ("runtime", "런타임", "string"),
         ("summary", "행위 요약", "string"), ("mitre_text", "MITRE", "string"),
-        ("src_ip", "출발지 IP", "string"),
+        ("src_ip_text", "출발지 IP", "string"),
         ("trace_id", "트레이스", "string"), ("trace_id", "AI 분석", "string"),
         ("trace_id", "trace_id", "string"),
         ("window_from_ms", "window_from_ms", "number"), ("window_to_ms", "window_to_ms", "number"),
+        ("src_ip", "src_ip", "string"),  # 링크용 원래 값 (표시 열에는 '· 시연용'이 붙을 수 있다)
     ]
     b.add("table", "사건 큐 · trace 1개 = 사건 1건 (미차단 우선 정렬)", 0, 9, 24, 10,
           [inf("/incidents?" + INC_Q + "&limit=100", queue_cols)],
@@ -281,13 +282,13 @@ def overview():
               ov("출발지 IP", custom__width=140, color=fixed(BLUE),
                  custom__cellOptions={"type": "color-text"},
                  links=[{"title": "위협 인텔리전스에서 보기",
-                         "url": "/d/" + UIDS["ti"] + "?var-ip=${__value.raw}&from=now-24h&to=now"}]),
+                         "url": "/d/" + UIDS["ti"] + "?var-ip=${__data.fields.src_ip}&from=now-24h&to=now"}]),
               ov("트레이스", custom__width=90, mappings=label_map("트레이스"),
                  links=[{"title": "Tempo에서 트레이스 열기", "url": explore_tempo("${__value.raw}"),
                          "targetBlank": True}]),
               ov("AI 분석", custom__width=90, mappings=label_map("AI 분석"),
                  links=[{"title": "사건 상세 + AI 해석", "url": INCIDENT_LINK}]),
-              hide("trace_id"), hide("window_from_ms"), hide("window_to_ms"),
+              hide("trace_id"), hide("window_from_ms"), hide("window_to_ms"), hide("src_ip"),
           ],
           desc="출처: tefal-backend /incidents. 미차단이 먼저, 그다음 최신순. 단계는 Sigma level, 판정 중 = Falco 경보 후 Tetragon 결과 대기.")
 
@@ -352,7 +353,7 @@ def incident():
           [inf("/incidents/${trace_id}",
                [("status_text", "상태", "string"), ("workload", "워크로드", "string"),
                 ("runtime_detail", "런타임", "string"), ("time_text", "시작", "string"),
-                ("mitre_text", "MITRE", "string"), ("src_ip", "출발지 IP", "string")])],
+                ("mitre_text", "MITRE", "string"), ("src_ip_text", "출발지 IP", "string")])],
           DS_B, {**stat_opts(fields="/.*/", size=(12, 18), color="none"), "colorMode": "none"},
           defaults={"noValue": "trace_id를 입력하세요"},
           links=[{"title": "← 사건 큐", "url": "/d/" + UIDS["overview"] + "?from=now-1h&to=now"}])
@@ -391,7 +392,8 @@ def incident():
     b.add("stat", "출발지 IP 요약", 16, 19, 8, 9,
           [inf("/ti/ip/${src_ip}",
                [("ip", "IP", "string"), ("country_asn", "국가 / ASN", "string"),
-                ("abuse_score", "AbuseIPDB 점수", "number"), ("vt_text", "VirusTotal", "string")])],
+                ("abuse_score", "AbuseIPDB 점수", "number"), ("vt_text", "VirusTotal", "string"),
+                ("notice", "안내", "string")])],
           DS_B, {**stat_opts(fields="/.*/", size=(12, 18)), "orientation": "horizontal"},
           defaults={"color": fixed("text"), "noValue": "사설 IP 또는 정보 없음",
                     "thresholds": thresholds((None, "text"))},
@@ -418,7 +420,8 @@ def incident():
 # =====================================================================
 def threat_intel():
     b = Builder()
-    ti_cols = [("ip", "IP", "string"), ("country", "국가", "string"), ("asn_isp", "ASN / ISP", "string"),
+    ti_cols = [("ip", "IP", "string"), ("role", "구분", "string"), ("country", "국가", "string"),
+               ("asn_isp", "ASN / ISP", "string"),
                ("abuse_score", "Abuse 점수", "number"), ("abuse_reports", "신고 수", "number"),
                ("vt_text", "VT 악성", "string"), ("related_incidents", "관련 사건", "number"),
                ("last_checked", "최근 조회", "string"),
@@ -426,13 +429,13 @@ def threat_intel():
     ips_url = "/ti/ips?" + TR + "&min_abuse=${min_abuse}"
     abuse_thr = thresholds((None, GREY), (25, ORANGE), (75, RED))
 
-    b.add("geomap", "출발지 IP 위치 · 색 = Abuse 점수", 0, 0, 16, 12,
+    b.add("geomap", "TI 대상 IP 위치 · 색 = Abuse 점수", 0, 0, 16, 12,
           [inf(ips_url, ti_cols)], DS_B,
           {"view": {"id": "zero", "lat": 20, "lon": 10, "zoom": 1.6, "allLayers": True},
            "controls": {"showZoom": True, "mouseWheelZoom": True, "showAttribution": True},
            "basemap": {"type": "carto", "name": "basemap", "config": {"theme": "dark", "showLabels": True}},
            "layers": [{
-               "type": "markers", "name": "출발지 IP", "tooltip": True,
+               "type": "markers", "name": "TI 대상 IP", "tooltip": True,
                "location": {"mode": "coords", "latitude": "lat", "longitude": "lon"},
                "config": {"showLegend": True, "style": {
                    "size": {"fixed": 9, "min": 4, "max": 15},
@@ -443,8 +446,10 @@ def threat_intel():
                                   "textAlign": "left", "textBaseline": "middle"}}}}],
            "tooltip": {"mode": "details"}},
           defaults={"color": {"mode": "thresholds"}, "thresholds": abuse_thr, "min": 0, "max": 100},
-          desc="Geomap 패널 · GeoIP (MaxMind). 75 이상 고위험(빨강), 25–74(주황), 25 미만/정보 없음(회색). "
-               "사설 IP(10/8, 172.16/12, 192.168/16)는 조회 대상에서 제외합니다.")
+          desc="Geomap 패널 · GeoIP (MaxMind). 대상 = 사건 출발지 + 감시 pod가 밖으로 연결한 공인 IP. "
+               "75 이상 고위험(빨강), 25–74(주황), 25 미만/정보 없음(회색). "
+               "사설 IP(10/8, 172.16/12, 192.168/16 등)는 외부로 보내지 않습니다. "
+               "'출발지 (시연용)'은 시연 모드(DEMO_SRC_IP_POOL)로 바꾼 IP라 실제 공격 출발지가 아닙니다.")
 
     sum_url = "/ti/summary?" + TR
     b.add("stat", "조회된 공인 IP", 16, 0, 4, 4, [inf(sum_url, [("public_ip_count", "IP", "number")])],
@@ -472,6 +477,9 @@ def threat_intel():
           overrides=[
               ov("IP", custom__width=150, links=[{"title": "이 IP 상세 보기",
                                                  "url": "/d/" + UIDS["ti"] + "?var-ip=${__value.raw}&${__url_time_range}"}]),
+              ov("구분", custom__width=130, mappings=[{"type": "regex", "options": {
+                  "pattern": ".*시연용.*", "result": {"color": ORANGE, "index": 0}}}],
+                 custom__cellOptions={"type": "color-text"}),
               ov("국가", custom__width=60),
               ov("Abuse 점수", custom__width=220, min=0, max=100, color={"mode": "thresholds"},
                  thresholds=abuse_thr,
@@ -487,7 +495,8 @@ def threat_intel():
     ip_url = "/ti/ip/${ip}"
     b.add("stat", "선택 IP 상세 · ${ip}", 0, 20, 12, 5,
           [inf(ip_url, [("abuse_score", "Abuse 신뢰 점수", "number"), ("last_reported", "최근 신고", "string"),
-                        ("usage_type", "용도", "string"), ("is_tor", "Tor 노드", "string")])],
+                        ("usage_type", "용도", "string"), ("is_tor", "Tor 노드", "string"),
+                        ("notice", "안내", "string")])],
           DS_B, stat_opts(fields="/.*/", size=(12, 18)),
           defaults={"color": fixed("text"), "noValue": "IP 조회 변수에 공인 IP를 입력하세요",
                     "thresholds": thresholds((None, "text"))},
@@ -509,13 +518,14 @@ def threat_intel():
                 ("vt_malicious", "VT 악성", "number"), ("message", "판정", "string")])],
           DS_B, table_opts(),
           defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}, "inspect": True},
-                    "noValue": "업로드된 파일 없음"},
+                    "noValue": "파일 해시 수집 전 (Tetragon IMA 해시 정책 필요)"},
           overrides=[ov("VT 악성", custom__width=80, color={"mode": "thresholds"},
                         thresholds=thresholds((None, BLUE), (1, RED)),
                         custom__cellOptions={"type": "color-text"}),
                      ov("SHA-256", custom__width=200)],
           links=[{"title": "관련 사건 보기 →", "url": "/d/" + UIDS["overview"] + "?${__url_time_range}"}],
-          desc="VirusTotal. 기록이 없어도 Tetragon이 행위 기준으로 차단했을 수 있습니다.")
+          desc="VirusTotal 파일 해시 조회. Tetragon 로그에 파일 해시가 없어 아직 비어 있습니다 "
+               "(IMA 해시 수집 정책을 켜면 연결). 기록이 없어도 Tetragon이 행위 기준으로 차단했을 수 있습니다.")
 
     variables = [textbox("ip", "IP 조회"), textbox("min_abuse", "최소 Abuse 점수", "0")]
     return dashboard("ti", "위협 인텔리전스", b, variables, time_from="now-24h",

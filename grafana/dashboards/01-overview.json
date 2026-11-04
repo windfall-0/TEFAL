@@ -876,7 +876,7 @@
               "type": "string"
             },
             {
-              "selector": "src_ip",
+              "selector": "src_ip_text",
               "text": "출발지 IP",
               "type": "string"
             },
@@ -904,6 +904,11 @@
               "selector": "window_to_ms",
               "text": "window_to_ms",
               "type": "number"
+            },
+            {
+              "selector": "src_ip",
+              "text": "src_ip",
+              "type": "string"
             }
           ],
           "filters": []
@@ -1090,7 +1095,7 @@
                 "value": [
                   {
                     "title": "위협 인텔리전스에서 보기",
-                    "url": "/d/tefal-ti?var-ip=${__value.raw}&from=now-24h&to=now"
+                    "url": "/d/tefal-ti?var-ip=${__data.fields.src_ip}&from=now-24h&to=now"
                   }
                 ]
               }
@@ -1204,6 +1209,18 @@
                 "value": true
               }
             ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "src_ip"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
           }
         ]
       },
@@ -1224,7 +1241,8 @@
               "AI 분석": 9,
               "trace_id": 10,
               "window_from_ms": 11,
-              "window_to_ms": 12
+              "window_to_ms": 12,
+              "src_ip": 13
             }
           }
         }

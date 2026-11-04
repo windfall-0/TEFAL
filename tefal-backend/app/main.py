@@ -10,6 +10,8 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import APIRouter, Depends, FastAPI
 
+from app.ai.analysis import AiService
+from app.ai.gemini import GeminiClient
 from app.config import Settings
 from app.core.auth import require_token
 from app.core.cache import SqliteCache
@@ -23,7 +25,9 @@ from app.incidents.levels import SigmaLevels
 from app.incidents.store import IncidentStore
 from app.incidents.tempo import TempoClient
 from app.k8s import K8sClient
-from app.routers import incidents, infra, ingest, ops, policies
+from app.routers import ai, incidents, infra, ingest, ops, policies, ti
+from app.ti.geo import GeoIP
+from app.ti.service import TiService
 
 
 @asynccontextmanager
@@ -45,9 +49,17 @@ async def lifespan(app: FastAPI):
         if settings.tempo_export_enabled
         else None
     )
+    app.state.geo = GeoIP(settings.geoip_city_db, settings.geoip_asn_db)
+    app.state.ti = TiService(settings, app.state.cache, app.state.http, app.state.geo)
+    loki = LokiClient(app.state.http, settings.loki_url)
+    gemini = (
+        GeminiClient(app.state.http, settings.gemini_api_key.get_secret_value(), settings.gemini_model)
+        if settings.gemini_api_key and settings.gemini_model
+        else None
+    )
+    app.state.ai = AiService(settings, app.state.cache, app.state.incidents, loki, gemini, app.state.ti)
     task = None
     if settings.collector_enabled:
-        loki = LokiClient(app.state.http, settings.loki_url)
         collector = Collector(
             settings,
             app.state.incidents,
@@ -65,6 +77,7 @@ async def lifespan(app: FastAPI):
             task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await task
+        app.state.geo.close()
         await app.state.http.aclose()
         if app.state.k8s is not None:
             await app.state.k8s.close()
@@ -97,4 +110,4 @@ AUTH = [Depends(require_token)]
 
 
 def _api_routers() -> list[APIRouter]:
-    return [incidents.router, infra.router, policies.router]
+    return [incidents.router, infra.router, policies.router, ti.router, ai.router]

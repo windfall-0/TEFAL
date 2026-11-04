@@ -5,6 +5,8 @@ from functools import cached_property
 from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.demo import parse_pool
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -64,9 +66,22 @@ class Settings(BaseSettings):
     cache_db: str = "sqlite:////data/tefal.db"
     watch_namespaces: str = "web"
 
+    # 시연 모드 (core/demo.py). 쉼표로 구분한 공인 IP. 비어 있으면 꺼짐
+    demo_src_ip_pool: str = ""
+
     # 공통
     http_timeout_seconds: float = 5.0
     display_tz: str = "Asia/Seoul"
+
+    @field_validator("demo_src_ip_pool")
+    @classmethod
+    def _check_demo_pool(cls, v: str) -> str:
+        parse_pool(v)  # 잘못된 값이면 기동 시 바로 실패시킨다
+        return v
+
+    @cached_property
+    def demo_src_ip_list(self) -> list[str]:
+        return parse_pool(self.demo_src_ip_pool)
 
     @field_validator("cache_db")
     @classmethod

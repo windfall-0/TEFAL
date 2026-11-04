@@ -8,6 +8,7 @@ from typing import Annotated
 import httpx
 from fastapi import APIRouter, Depends, Query, Request
 
+from app.core.demo import demo_ip
 from app.core.errors import ApiError
 from app.core.params import ALLOWED_LEVELS, CommonFilters, common_filters
 from app.core.timefmt import fmt_hm, fmt_hms
@@ -35,8 +36,9 @@ def _is_unblocked(status: str) -> bool:
     return status != "blocked"
 
 
-def to_model(inc: Incident, tz: str) -> dict:
+def to_model(inc: Incident, tz: str, demo_pool: list[str] | None = None) -> dict:
     ms = inc.anchor_ms
+    src_ip = demo_ip(inc.src_ip, demo_pool or [])
     frac = f"{inc.start_ms % 1000:03d}"
     return {
         "trace_id": inc.trace_id,
@@ -57,7 +59,11 @@ def to_model(inc: Incident, tz: str) -> dict:
         "runtime_detail": inc.runtime_detail or inc.runtime,
         "summary": inc.summary,
         "mitre": inc.mitre,
-        "src_ip": inc.src_ip,
+        "src_ip": src_ip,
+        "src_ip_original": inc.src_ip,
+        "src_ip_demo": src_ip != inc.src_ip,
+        # 화면 표시용: 시연 IP는 실제 출발지가 아니라는 표시를 붙인다
+        "src_ip_text": f"{src_ip} · 시연용" if src_ip != inc.src_ip else src_ip,
         "exec_id": inc.exec_id,
         "parent_exec_id": inc.parent_exec_id,
         "policy": inc.policy,
@@ -77,8 +83,8 @@ def to_model(inc: Incident, tz: str) -> dict:
 async def list_incidents(
     request: Request, f: Filters, limit: Annotated[int, Query(ge=1, le=1000)] = 100
 ) -> list[dict]:
-    tz = request.app.state.settings.display_tz
-    return [to_model(i, tz) for i in await _store(request).query(f, limit)]
+    s = request.app.state.settings
+    return [to_model(i, s.display_tz, s.demo_src_ip_list) for i in await _store(request).query(f, limit)]
 
 
 async def _running_pods(request: Request, namespace: str | None) -> int | None:
@@ -170,4 +176,5 @@ async def get_incident(request: Request, trace_id: str) -> dict:
     inc = await _store(request).get(tid)
     if inc is None:
         raise ApiError(404, "not_found", "사건이 없습니다")
-    return to_model(inc, request.app.state.settings.display_tz)
+    s = request.app.state.settings
+    return to_model(inc, s.display_tz, s.demo_src_ip_list)

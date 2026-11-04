@@ -4,6 +4,8 @@
 - counters: 일일 한도(UTC 날짜 버킷), 캐시 적중/미스 집계에 쓴다.
 """
 
+import asyncio
+import functools
 import json
 import os
 import time
@@ -30,6 +32,19 @@ CREATE TABLE IF NOT EXISTS counters (
 """
 
 
+def _serialized(fn):
+    """한 연결을 여러 요청이 같이 쓰므로 조회·커밋을 한 번에 하나씩 한다.
+
+    Grafana가 패널 여러 개를 동시에 부르면, 한 요청의 commit이 다른 요청의 열린 SELECT와 겹쳐
+    'cannot commit transaction - SQL statements in progress'로 실패했다.
+    """
+    @functools.wraps(fn)
+    async def wrapper(self, *args, **kwargs):
+        async with self._lock:
+            return await fn(self, *args, **kwargs)
+    return wrapper
+
+
 @dataclass(frozen=True)
 class CacheEntry:
     value: Any
@@ -44,6 +59,7 @@ class CacheEntry:
 class SqliteCache:
     def __init__(self, conn: aiosqlite.Connection) -> None:
         self._conn = conn
+        self._lock = asyncio.Lock()
 
     @classmethod
     async def open(cls, path: str) -> "SqliteCache":
@@ -59,11 +75,13 @@ class SqliteCache:
     async def close(self) -> None:
         await self._conn.close()
 
+    @_serialized
     async def ping(self) -> None:
         async with self._conn.execute("SELECT 1") as cur:
             await cur.fetchone()
 
     # ---- kv ----
+    @_serialized
     async def get(self, namespace: str, key: str) -> CacheEntry | None:
         async with self._conn.execute(
             "SELECT value, stored_at, expires_at FROM kv WHERE namespace=? AND key=?",
@@ -74,6 +92,7 @@ class SqliteCache:
             return None
         return CacheEntry(json.loads(row[0]), row[1], row[2])
 
+    @_serialized
     async def set(self, namespace: str, key: str, value: Any, ttl_seconds: float) -> None:
         now = time.time()
         await self._conn.execute(
@@ -84,11 +103,13 @@ class SqliteCache:
         )
         await self._conn.commit()
 
+    @_serialized
     async def delete(self, namespace: str, key: str) -> None:
         await self._conn.execute("DELETE FROM kv WHERE namespace=? AND key=?", (namespace, key))
         await self._conn.commit()
 
     # ---- counters ----
+    @_serialized
     async def incr(self, name: str, bucket: str, amount: int = 1) -> int:
         async with self._conn.execute(
             "INSERT INTO counters(name, bucket, count) VALUES (?,?,?) "
@@ -100,6 +121,7 @@ class SqliteCache:
         await self._conn.commit()
         return int(row[0])
 
+    @_serialized
     async def get_counter(self, name: str, bucket: str) -> int:
         async with self._conn.execute(
             "SELECT count FROM counters WHERE name=? AND bucket=?", (name, bucket)

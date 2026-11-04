@@ -338,6 +338,14 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
 }
 ```
 
+구현 (`app/ai/`, 2026-11-04): Gemini REST `generateContent`(`GEMINI_MODEL`, 기본 배포 `gemini-flash-latest`)에 `responseSchema`를 강제한다.
+- 응답에 `input_lines`(모델에 넣은 이벤트 줄 수)가 더 있다. `evidence`는 `[{"line": 원문 줄, "why": 이유}]`다.
+- 근거: 모델은 입력 줄 번호(`E1`…)만 고른다. 서버가 그 번호를 실제 입력 줄로 바꾸고, 입력에 없는 번호는 버린다. MITRE ID는 `T####(.###)` 형식만 남긴다. `verdict`·`risk`가 정해진 값이 아니면 `판단 불가`·`중간`.
+- 이벤트는 members 키로 Loki에서 다시 읽고(사건 구간 −65초 ~ +10초, 같은 pod), 1초 안 반복은 `×N`으로 접는다(`dedup.py`).
+- 오류: 키·모델이 없으면 `503 ai_unavailable`, Gemini 실패(재시도 포함)면 `502 ai_error`. 직전 캐시가 있으면 그 값을 준다. 재시도는 3초 뒤 1회(503 과부하·429 대비).
+- 출발지 IP는 사건 DB 원본을 넣는다(시연 IP를 넣지 않는다). 사설 IP면 "SNAT로 가려졌을 수 있음"을 함께 적는다.
+- 2026-11-04 확인: 키는 유효(모델 목록 조회 성공). `gemini-flash-latest`는 503(과부하) 뒤 429(무료 할당량 초과), `gemini-2.5-flash`는 404(신규 사용자에게 제공 안 함). 모델 결정은 보류 중이다.
+
 **생성 규칙**
 - 입력: 사건 모델 + 사건에 묶인 이벤트(`members`, 최대 50줄) + Falco 경보 + TI 요약
 - Gemini에는 **구조화 출력(JSON schema)** 을 강제하고, 파싱이 실패하면 1회 재시도한다.
@@ -350,8 +358,16 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
 
 ### 5.4 위협 인텔리전스 (② 출발지 IP 요약, ③ 전체)
 
+구현 (`app/ti/`, `app/routers/ti.py`, 2026-11-04):
+- **대상 IP:** 사건 출발지 + 감시 pod가 밖으로 연결한 목적지(Tetragon `sock_arg.daddr`, Falco `fd.rip`/`fd.name`). 둘 다 공인 IP만이다. 목적지는 수집기가 `remote_ips` 표에 쌓는다. API도 외부로 보내기 전에 공인 IP인지 한 번 더 확인한다.
+- 이 실습 환경에서는 실제 출발지(NodePort SNAT `10.233.66.37`)와 목적지(LDAP 콜백 `192.168.0.157:1389`)가 모두 사설 IP다. 그래서 시연 모드(`DEMO_SRC_IP_POOL`)가 아니면 ③ 표가 비어 있다.
+- **시연 IP 표시:** 시연 모드로 바꾼 IP는 `role`이 `출발지 (시연용)`, `demo: true`이고, `notice`에 "시연용 IP입니다. 실제 공격 출발지가 아닙니다"가 붙는다. 사건 응답에는 `src_ip_text`(`<IP> · 시연용`)가 있다. 시연 IP 조회 수는 `/ti/summary`의 `demo_lookups`로 따로 센다.
+- 목록 한 번에 새로 외부 조회하는 IP는 10개까지다. 나머지는 캐시만 쓰고 다음 새로고침에 채운다. `/ti/summary`는 외부 조회를 하지 않는다.
+- AbuseIPDB `check`(verbose, 90일), VirusTotal `ip_addresses/{ip}`(404 = 기록 없음 = 0/0), GeoLite2 City·ASN(`/data/*.mmdb`, PVC).
+- SQLite 캐시 연결은 요청 하나씩 쓰도록 잠근다. Grafana가 패널을 동시에 부를 때 commit과 SELECT가 겹쳐 실패하던 문제를 막는다.
+
 #### `GET /ti/ips`
-③ Geomap과 IP 평판 표가 함께 쓴다. 시간 범위 안 사건의 출발지 IP 중 공인 IP만 준다.
+③ Geomap과 IP 평판 표가 함께 쓴다. 시간 범위 안 TI 대상 IP(위)를 준다. 항목에는 `role`, `related_pods`, `demo`, `notice`가 더 있다.
 - 파라미터: `from`, `to`, `min_abuse`(기본 0)
 ```json
 [{
@@ -407,6 +423,7 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
 ```
 
 #### `GET /ti/files`
+**지금은 빈 목록을 준다.** Tetragon 로그에 파일 해시가 없어서다(미결정 1). 화면에는 "파일 해시 수집 전"이 나온다. 아래는 연결 뒤 모양이다.
 ③ 파일 해시 조회. 시간 범위 안 사건에서 업로드·쓰기된 파일을 준다.
 - 파라미터: `from`, `to`, `ip`(선택)
 ```json
@@ -584,7 +601,7 @@ Hubble Relay `GetFlows`에서 `verdict=DROPPED`이고 출발지나 목적지 pod
 | `GEOIP_CITY_DB` | `/data/GeoLite2-City.mmdb` | |
 | `GEOIP_ASN_DB` | `/data/GeoLite2-ASN.mmdb` | |
 | `GEMINI_API_KEY` | (필수) | |
-| `GEMINI_MODEL` | (설정) | 사용할 Gemini 모델 ID |
+| `GEMINI_MODEL` | (설정) | 사용할 Gemini 모델 ID. 배포값 `gemini-flash-latest` |
 | `TI_CACHE_TTL_HOURS` | `24` | |
 | `AI_CACHE_TTL_DAYS` | `7` | |
 | `AI_REFRESH_PER_MIN` | `5` | |
@@ -592,6 +609,7 @@ Hubble Relay `GetFlows`에서 `verdict=DROPPED`이고 출발지나 목적지 pod
 | `CACHE_DB` | `sqlite:////data/tefal.db` | 또는 `redis://...` |
 | `WATCH_NAMESPACES` | `vuln-lab` | |
 | `SIGMA_LEVELS_FILE` | `/config/sigma_levels.yaml` | 경고 단계 매칭 표 (4.8) |
+| `DEMO_SRC_IP_POOL` | (빈 값 = 꺼짐) | 시연 모드. 쉼표로 구분한 공인 IP. 사건 응답의 내부 `src_ip`를 이 중 하나로 바꿔 보여 준다(같은 IP는 항상 같은 값). 원래 값은 `src_ip_original`, 바뀌었는지는 `src_ip_demo`. DB·Loki·Tempo는 원본 그대로 |
 
 API 키는 K8s `Secret`으로 주입한다. 이미지와 ConfigMap에 넣지 않는다.
 
@@ -603,7 +621,7 @@ API 키는 K8s `Secret`으로 주입한다. 이미지와 ConfigMap에 넣지 않
   - ClusterRole `tefal-backend-read`: `pods`, `nodes`, `daemonsets`·`deployments`·`statefulsets`, `tracingpolicies`, `tracingpoliciesnamespaced`, `ciliumnetworkpolicies`, `ciliumclusterwidenetworkpolicies`에 `get/list`만 준다.
   - Role `falco/tefal-backend-falco-rules`: ConfigMap `falco-rules` 하나에 `get`만 준다(`resourceNames`).
   - Secret, ConfigMap 목록, `create/update/delete/exec`는 주지 않는다. 실제 클러스터에서 `kubectl auth can-i`로 확인했다.
-- **네트워크:** `CiliumNetworkPolicy`로 ingress는 Grafana, Prometheus(지표 수집), Falcosidekick core(`falco` namespace)만 허용한다. egress는 Tempo(3200, 4318), Loki(3100), Prometheus(9090), K8s API, Hubble Relay(4245), DNS(nodelocaldns), `pypi.org`·`files.pythonhosted.org`(빌드 없는 배포의 의존성 설치)만 허용한다. `api.abuseipdb.com`, `www.virustotal.com`, `generativelanguage.googleapis.com`은 해당 기능 단계에서 추가한다. 현재 정책은 `deploy/backend/gen_backend.py`가 만든다.
+- **네트워크:** `CiliumNetworkPolicy`로 ingress는 Grafana, Prometheus(지표 수집), Falcosidekick core(`falco` namespace)만 허용한다. egress는 Tempo(3200, 4318), Loki(3100), Prometheus(9090), K8s API, Hubble Relay(4245), DNS(nodelocaldns), `pypi.org`·`files.pythonhosted.org`(빌드 없는 배포의 의존성 설치)만 허용한다. `api.abuseipdb.com`, `www.virustotal.com`, `generativelanguage.googleapis.com`(443, 5단계)도 허용한다. 현재 정책은 `deploy/backend/gen_backend.py`가 만든다.
 - **로그 속 비밀값:** Tetragon 이벤트의 `arguments`에는 명령 인자가 그대로 들어 있어서 비밀번호가 섞일 수 있다(실제 클러스터에서 `curl -u admin:<비밀번호>`가 확인됨). AI 프롬프트, 사건 요약, Tempo span 속성에 넣기 전에 `-u user:pass`, `--password=`, `Authorization:`, `token=` 같은 패턴을 `<가림>`으로 바꾼다.
 - **입력 검증:** `trace_id`는 hex 32자, `ip`는 `ipaddress` 모듈로 검증한다. TraceQL/LogQL에 사용자 입력을 문자열로 이어 붙이지 않는다.
 - **로그:** API 키와 Authorization 헤더는 로그에 남기지 않는다.

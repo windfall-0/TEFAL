@@ -75,6 +75,17 @@ CREATE TABLE IF NOT EXISTS detections (  -- 탐지 1건 = 1초 안 반복을 접
     count     INTEGER NOT NULL            -- 접힌 원본 줄 수
 );
 CREATE INDEX IF NOT EXISTS detections_first ON detections(first_ns);
+CREATE TABLE IF NOT EXISTS remote_ips (  -- 감시 pod가 밖으로 연결한 공인 IP (③ TI 대상, 5.4)
+    ip        TEXT NOT NULL,
+    namespace TEXT NOT NULL,
+    pod       TEXT NOT NULL,
+    source    TEXT NOT NULL,              -- tetragon | falco
+    port      INTEGER,
+    first_ns  INTEGER NOT NULL,
+    last_ns   INTEGER NOT NULL,
+    count     INTEGER NOT NULL,
+    PRIMARY KEY (ip, pod, source)
+);
 """
 
 COLUMNS = ["trace_id", "start_ms", "anchor_ms", "last_ms", "status", "level", "level_source", "action", "detected_by", "namespace", "pod", "node", "runtime", "runtime_detail", "summary", "mitre", "src_ip", "exec_id", "parent_exec_id", "policy", "container_id", "falco_rules", "falco_ms", "beyla_trace_id", "beyla_link_confidence", "beyla_span_id", "updated_ms"]
@@ -250,6 +261,13 @@ class IncidentStore:
             return None
         return _row_to_incident(row, await self.member_count(trace_id))
 
+    async def member_keys(self, trace_id: str) -> set[tuple[str, int, str]]:
+        """사건에 묶인 이벤트 키 (exec_id, event_time_ns, event_type). AI 입력을 Loki에서 다시 읽을 때 쓴다."""
+        async with self._conn.execute(
+            "SELECT exec_id, event_time_ns, event_type FROM members WHERE trace_id=?", (trace_id,)
+        ) as cur:
+            return {(r[0], r[1], r[2]) for r in await cur.fetchall()}
+
     async def member_count(self, trace_id: str) -> int:
         async with self._conn.execute("SELECT COUNT(*) FROM members WHERE trace_id=?", (trace_id,)) as cur:
             return (await cur.fetchone())[0]
@@ -323,6 +341,28 @@ class IncidentStore:
 
     async def prune_detections(self, before_ns: int) -> None:
         await self._conn.execute("DELETE FROM detections WHERE first_ns < ?", (before_ns,))
+        await self._conn.execute("DELETE FROM remote_ips WHERE last_ns < ?", (before_ns,))
+
+    # ---- 외부 연결 (③ TI 대상) ----
+    async def add_remote_ip(self, ip: str, namespace: str, pod: str, source: str, port: int | None, t_ns: int) -> None:
+        await self._conn.execute(
+            "INSERT INTO remote_ips(ip, namespace, pod, source, port, first_ns, last_ns, count) VALUES (?,?,?,?,?,?,?,1) "
+            "ON CONFLICT(ip, pod, source) DO UPDATE SET count = count + 1, "
+            "first_ns = MIN(first_ns, excluded.first_ns), last_ns = MAX(last_ns, excluded.last_ns), "
+            "port = COALESCE(excluded.port, port)",
+            (ip, namespace, pod, source, port, t_ns, t_ns),
+        )
+
+    async def remote_ips(self, from_ns: int, to_ns: int, namespace: str | None = None) -> list[dict]:
+        where, args = ["last_ns >= ? AND first_ns <= ?"], [from_ns, to_ns]
+        if namespace:
+            where.append("namespace = ?")
+            args.append(namespace)
+        async with self._conn.execute(
+            f"SELECT ip, namespace, pod, source, port, first_ns, last_ns, count FROM remote_ips WHERE {' AND '.join(where)}",
+            args,
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
 
     async def runtimes_by_pod(self) -> dict[str, str]:
         """사건에서 확인된 pod별 런타임 (④ 워크로드 표)."""

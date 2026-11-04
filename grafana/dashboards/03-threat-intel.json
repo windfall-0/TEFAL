@@ -157,8 +157,8 @@
     {
       "id": 1,
       "type": "geomap",
-      "title": "출발지 IP 위치 · 색 = Abuse 점수",
-      "description": "Geomap 패널 · GeoIP (MaxMind). 75 이상 고위험(빨강), 25–74(주황), 25 미만/정보 없음(회색). 사설 IP(10/8, 172.16/12, 192.168/16)는 조회 대상에서 제외합니다.",
+      "title": "TI 대상 IP 위치 · 색 = Abuse 점수",
+      "description": "Geomap 패널 · GeoIP (MaxMind). 대상 = 사건 출발지 + 감시 pod가 밖으로 연결한 공인 IP. 75 이상 고위험(빨강), 25–74(주황), 25 미만/정보 없음(회색). 사설 IP(10/8, 172.16/12, 192.168/16 등)는 외부로 보내지 않습니다. '출발지 (시연용)'은 시연 모드(DEMO_SRC_IP_POOL)로 바꾼 IP라 실제 공격 출발지가 아닙니다.",
       "gridPos": {
         "x": 0,
         "y": 0,
@@ -190,6 +190,11 @@
             {
               "selector": "ip",
               "text": "IP",
+              "type": "string"
+            },
+            {
+              "selector": "role",
+              "text": "구분",
               "type": "string"
             },
             {
@@ -265,7 +270,7 @@
         "layers": [
           {
             "type": "markers",
-            "name": "출발지 IP",
+            "name": "TI 대상 IP",
             "tooltip": true,
             "location": {
               "mode": "coords",
@@ -837,6 +842,11 @@
               "type": "string"
             },
             {
+              "selector": "role",
+              "text": "구분",
+              "type": "string"
+            },
+            {
               "selector": "country",
               "text": "국가",
               "type": "string"
@@ -926,6 +936,39 @@
                     "url": "/d/tefal-ti?var-ip=${__value.raw}&${__url_time_range}"
                   }
                 ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "구분"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".*시연용.*",
+                      "result": {
+                        "color": "#FFB357",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
               }
             ]
           },
@@ -1097,15 +1140,16 @@
           "options": {
             "indexByName": {
               "IP": 0,
-              "국가": 1,
-              "ASN / ISP": 2,
-              "Abuse 점수": 3,
-              "신고 수": 4,
-              "VT 악성": 5,
-              "관련 사건": 6,
-              "최근 조회": 7,
-              "lat": 8,
-              "lon": 9
+              "구분": 1,
+              "국가": 2,
+              "ASN / ISP": 3,
+              "Abuse 점수": 4,
+              "신고 수": 5,
+              "VT 악성": 6,
+              "관련 사건": 7,
+              "최근 조회": 8,
+              "lat": 9,
+              "lon": 10
             }
           }
         }
@@ -1162,6 +1206,11 @@
             {
               "selector": "is_tor",
               "text": "Tor 노드",
+              "type": "string"
+            },
+            {
+              "selector": "notice",
+              "text": "안내",
               "type": "string"
             }
           ],
@@ -1407,7 +1456,7 @@
       "id": 10,
       "type": "table",
       "title": "파일 해시 조회 · 업로드된 웹셸",
-      "description": "VirusTotal. 기록이 없어도 Tetragon이 행위 기준으로 차단했을 수 있습니다.",
+      "description": "VirusTotal 파일 해시 조회. Tetragon 로그에 파일 해시가 없어 아직 비어 있습니다 (IMA 해시 수집 정책을 켜면 연결). 기록이 없어도 Tetragon이 행위 기준으로 차단했을 수 있습니다.",
       "gridPos": {
         "x": 12,
         "y": 20,
@@ -1476,7 +1525,7 @@
             },
             "inspect": true
           },
-          "noValue": "업로드된 파일 없음"
+          "noValue": "파일 해시 수집 전 (Tetragon IMA 해시 정책 필요)"
         },
         "overrides": [
           {

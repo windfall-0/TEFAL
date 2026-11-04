@@ -7,11 +7,13 @@ Loki의 Tetragon(정책이 걸린 이벤트)·Falco 로그를 구간별로 읽�
 사건 수집기처럼 커서를 두고 조금씩 읽는다.
 """
 
+import ipaddress
 import json
 import logging
 import time
 
 from app.config import Settings
+from app.core.validators import is_public_ip
 from app.incidents import dedup
 from app.incidents.store import IncidentStore
 from app.incidents.tetragon import parse_event, parse_time_ns
@@ -60,6 +62,7 @@ class DetectionCollector:
 
         await self._save_tetragon(tet)
         await self._save_falco(fal)
+        await self._save_remote(tet, fal)
         await self.store.set_state(CURSOR_KEY, str(end))
         await self.store.prune_detections(now_ns - RETENTION_DAYS * 86400 * NS)
         await self.store.commit()
@@ -99,3 +102,59 @@ class DetectionCollector:
         for run in dedup.collapse(alerts, lambda a: a[1], lambda a: a[0], self.gap_ns):
             _, key, rule, prio, ns = run.first
             await self._add(("f", *key), "falco", rule, ns, prio, run)
+
+    async def _save_remote(self, tet: list[tuple[int, str]], fal: list[tuple[int, str]]) -> None:
+        """감시 namespace pod가 밖으로 연결한 공인 IP를 모은다 (③ TI 대상). 사설 IP는 저장하지 않는다."""
+        watch = set(self.s.watch_namespace_list)
+        for _, line in tet:
+            if '"daddr"' not in line:
+                continue
+            e = parse_event(line)
+            if e is None or e.namespace not in watch:
+                continue
+            body = next(v for k, v in json.loads(line).items() if k.startswith("process_"))
+            for a in body.get("args") or []:
+                sock = a.get("sock_arg") if isinstance(a, dict) else None
+                ip = _public((sock or {}).get("daddr"))
+                if ip:
+                    await self.store.add_remote_ip(ip, e.namespace, e.pod, "tetragon", sock.get("dport"), e.time_ns)
+        for loki_ns, line in fal:
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(d, dict):
+                continue
+            of = d.get("output_fields") or {}
+            ns, pod = of.get("k8s.ns.name"), of.get("k8s.pod.name")
+            if ns not in watch or not pod:
+                continue
+            raw_ip, port = _falco_remote(of)
+            ip = _public(raw_ip)
+            if ip:
+                t = parse_time_ns(d.get("time") or "") or loki_ns
+                await self.store.add_remote_ip(ip, ns, pod, "falco", port, t)
+
+
+def _public(ip: str | None) -> str | None:
+    if not ip:
+        return None
+    try:
+        addr = ipaddress.ip_address(ip.strip("[]"))
+    except ValueError:
+        return None
+    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
+        addr = addr.ipv4_mapped  # Tetragon은 IPv4도 ::ffff:a.b.c.d로 줄 때가 있다
+    return str(addr) if is_public_ip(addr) else None
+
+
+def _falco_remote(of: dict) -> tuple[str | None, int | None]:
+    """Falco 연결 상대: fd.rip, 없으면 fd.name("a:p->b:p")의 오른쪽."""
+    ip, port = of.get("fd.rip"), of.get("fd.rport")
+    if not ip:
+        name = str(of.get("fd.name") or "")
+        if "->" in name:
+            right = name.split("->", 1)[1]
+            host, _, p = right.rpartition(":")
+            ip, port = host, (int(p) if p.isdigit() else None)
+    return ip, port
