@@ -1,0 +1,34 @@
+apiVersion: 1
+
+# 실제 환경(192.168.0.200, monitoring/grafana) 기준.
+#
+# Loki·Tempo는 Grafana에 이미 등록된 데이터소스를 그대로 쓴다. 여기서 다시 정의하지 않는다.
+#   - Loki  uid: P8E80F9AEF21F6940
+#   - Tempo uid: tempo-ds
+#   대시보드 JSON이 이 uid를 고정으로 참조한다. uid가 바뀌면 build 스크립트의 DS_L / DS_T를 같이 바꾼다.
+#
+# Prometheus는 kube-prometheus-stack(monitoring)이다. uid는 대시보드가 참조하는 `prometheus`로 고정한다.
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://kube-prometheus-stack-prometheus.monitoring:9090
+    jsonData:
+      timeInterval: 30s
+
+  # tefal-backend (Python API) · Infinity 플러그인 필요
+  - name: tefal-backend
+    uid: tefal-backend
+    type: yesoreyeram-infinity-datasource
+    access: proxy
+    url: http://tefal-backend.monitoring.svc:8000
+    jsonData:
+      auth_method: bearerToken
+      allowedHosts:
+        - http://tefal-backend.monitoring.svc:8000
+      timeoutInSeconds: 40
+    secureJsonData:
+      # Grafana 컨테이너 환경 변수에서 주입 (Secret → env)
+      bearerToken: $TEFAL_API_TOKEN

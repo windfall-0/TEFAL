@@ -1,0 +1,630 @@
+import json, sys, os, itertools
+
+OUT = sys.argv[1]
+
+DS_B = {"type": "yesoreyeram-infinity-datasource", "uid": "tefal-backend"}
+DS_P = {"type": "prometheus", "uid": "prometheus"}
+# 실제 환경(192.168.0.200) Grafana에 이미 있는 데이터소스 UID
+DS_L = {"type": "loki", "uid": "P8E80F9AEF21F6940"}
+DS_T = {"type": "tempo", "uid": "tempo-ds"}
+
+BLUE, RED, ORANGE, GREEN, GREY = "#5794F2", "#FF7383", "#FFB357", "#73BF69", "#8E8E8E"
+
+UIDS = {
+    "overview": "tefal-overview",
+    "incident": "tefal-incident",
+    "ti": "tefal-ti",
+    "infra": "tefal-infra",
+}
+
+TR = "from=${__from}&to=${__to}"
+INC_Q = TR + "&namespace=${namespace}&runtime=${runtime:csv}&status=${status}&level=${level:csv}"
+
+
+# ---------- helpers ----------
+def inf(url, cols, ref="A", root=""):
+    return {
+        "refId": ref, "datasource": DS_B,
+        "type": "json", "source": "url", "parser": "backend", "format": "table",
+        "url": url, "url_options": {"method": "GET", "data": ""},
+        "root_selector": root,
+        "columns": [{"selector": s, "text": t, "type": ty} for s, t, ty in cols],
+        "filters": [],
+    }
+
+
+def prom(expr, legend, ref="A", instant=True):
+    return {"refId": ref, "datasource": DS_P, "expr": expr, "legendFormat": legend,
+            "instant": instant, "range": not instant}
+
+
+def ov(name, **props):
+    return {"matcher": {"id": "byName", "options": name},
+            "properties": [{"id": k.replace("__", "."), "value": v} for k, v in props.items()]}
+
+
+def hide(name):
+    return ov(name, custom__hidden=True)
+
+
+def fixed(color):
+    return {"mode": "fixed", "fixedColor": color}
+
+
+def thresholds(*steps):
+    return {"mode": "absolute",
+            "steps": [{"color": c, "value": v} for v, c in steps]}
+
+
+class Builder:
+    def __init__(self):
+        self.ids = itertools.count(1)
+        self.panels = []
+
+    def add(self, type_, title, x, y, w, h, targets, ds, options=None, defaults=None,
+            overrides=None, desc="", links=None, transformations=None):
+        p = {
+            "id": next(self.ids), "type": type_, "title": title, "description": desc,
+            "gridPos": {"x": x, "y": y, "w": w, "h": h},
+            "datasource": ds, "targets": targets,
+            "options": options or {},
+            "fieldConfig": {"defaults": defaults or {}, "overrides": overrides or []},
+        }
+        if links:
+            p["links"] = links
+        if transformations:
+            p["transformations"] = transformations
+        self.panels.append(p)
+        return p
+
+
+def stat_opts(fields="", text="value_and_name", color="value", size=None, orient="auto"):
+    o = {
+        "reduceOptions": {"values": False, "calcs": ["lastNotNull"], "fields": fields},
+        "textMode": text, "colorMode": color, "graphMode": "none",
+        "justifyMode": "auto", "orientation": orient, "wideLayout": True,
+        "showPercentChange": False,
+    }
+    if size:
+        o["text"] = {"titleSize": size[0], "valueSize": size[1]}
+    return o
+
+
+def table_opts(sort=None):
+    o = {"showHeader": True, "cellHeight": "sm", "footer": {"show": False}}
+    if sort:
+        o["sortBy"] = sort
+    return o
+
+
+def nav_links():
+    links = []
+    for title, key in [("운영 현황", "overview"), ("사건 상세", "incident"),
+                       ("위협 인텔리전스", "ti"), ("인프라", "infra")]:
+        links.append({"title": title, "type": "link", "url": "/d/" + UIDS[key],
+                      "icon": "dashboard", "keepTime": True, "includeVars": False,
+                      "targetBlank": False, "asDropdown": False, "tags": [], "tooltip": ""})
+    for title, var in [("Hubble UI", "hubble_url"), ("Headlamp", "headlamp_url")]:
+        links.append({"title": title, "type": "link", "url": "${" + var + "}",
+                      "icon": "external link", "keepTime": False, "includeVars": False,
+                      "targetBlank": True, "asDropdown": False, "tags": [], "tooltip": ""})
+    return links
+
+
+def const(name, value, label=None):
+    return {"type": "constant", "name": name, "label": label or name, "hide": 2,
+            "query": value, "current": {"text": value, "value": value}, "options": []}
+
+
+def textbox(name, label, default=""):
+    return {"type": "textbox", "name": name, "label": label, "hide": 0, "query": default,
+            "current": {"text": default, "value": default}, "options": []}
+
+
+def custom(name, label, query, multi=False, include_all=True, default_all=True):
+    v = {"type": "custom", "name": name, "label": label, "hide": 0, "query": query,
+         "multi": multi, "includeAll": include_all, "options": []}
+    if include_all:
+        v["allValue"] = "All"
+    if default_all:
+        v["current"] = {"text": ["All"] if multi else "All",
+                        "value": ["$__all"] if multi else "$__all"}
+    return v
+
+
+def inf_var(name, url, selector):
+    q = inf(url, [(selector, selector, "string")])
+    q.pop("refId"); q.pop("datasource")
+    return {"type": "query", "name": name, "label": name, "hide": 2, "datasource": DS_B,
+            "query": {"queryType": "infinity", "query": "", "refId": "var-" + name,
+                      "infinityQuery": q},
+            "refresh": 1, "options": [], "current": {}, "includeAll": False, "multi": False}
+
+
+COMMON_VARS = [
+    const("hubble_url", "http://hubble.tefal.local", "Hubble UI URL"),
+    const("headlamp_url", "http://headlamp.tefal.local", "Headlamp URL"),
+]
+
+
+def dashboard(key, title, b, variables, time_from="now-1h", refresh="", desc=""):
+    return {
+        "uid": UIDS[key], "title": title, "description": desc,
+        "tags": ["tefal"], "editable": False, "graphTooltip": 1,
+        "timezone": "browser", "schemaVersion": 39, "version": 1,
+        "time": {"from": time_from, "to": "now"}, "refresh": refresh,
+        "timepicker": {"refresh_intervals": ["5s", "10s", "30s", "1m", "5m"]},
+        "links": nav_links(),
+        "templating": {"list": variables + COMMON_VARS},
+        "annotations": {"list": []},
+        "panels": b.panels,
+    }
+
+
+STATUS_MAP = {"type": "value", "options": {
+    "blocked": {"text": "차단됨", "color": BLUE, "index": 0},
+    "unblocked": {"text": "미차단", "color": RED, "index": 1},
+    "pending": {"text": "판정 중", "color": GREY, "index": 2},
+}}
+
+# Sigma rule level (critical > high > medium > low > informational)
+CRIT, YELLOW = "#C4162A", "#E0B400"
+LEVELS = [("critical", "Critical", CRIT), ("high", "High", RED), ("medium", "Medium", ORANGE),
+          ("low", "Low", YELLOW), ("informational", "Info", GREY)]
+LEVEL_MAP = {"type": "value", "options": {
+    k: {"text": t, "color": c, "index": i} for i, (k, t, c) in enumerate(LEVELS)}}
+
+
+def label_map(text):
+    return [{"type": "regex", "options": {"pattern": ".+", "result": {"text": text, "index": 0}}}]
+
+
+def explore_tempo(trace_expr):
+    u = DS_T["uid"]
+    return ("/explore?left=%7B%22datasource%22:%22" + u + "%22,%22queries%22:%5B%7B%22refId%22:%22A%22,"
+            "%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22" + u + "%22%7D,"
+            "%22queryType%22:%22traceql%22,%22query%22:%22" + trace_expr +
+            "%22%7D%5D,%22range%22:%7B%22from%22:%22now-24h%22,%22to%22:%22now%22%7D%7D")
+
+
+INCIDENT_LINK = ("/d/" + UIDS["incident"] + "?var-trace_id=${__data.fields.trace_id}"
+                 "&from=${__data.fields.window_from_ms}&to=${__data.fields.window_to_ms}")
+
+
+# =====================================================================
+# ① 운영 현황
+# =====================================================================
+def overview():
+    b = Builder()
+    summary_url = "/incidents/summary?" + INC_Q
+
+    b.add("stat", "조치 필요 · 미차단", 0, 0, 6, 5,
+          [inf(summary_url, [("unblocked_count", "미차단", "number"),
+                             ("unblocked_last_time", "최근", "string")])],
+          DS_B, stat_opts(size=(14, 48)),
+          defaults={"unit": "none", "color": fixed(RED), "noValue": "0",
+                    "mappings": [], "thresholds": thresholds((None, RED))},
+          overrides=[ov("최근", color=fixed("text"))],
+          desc="Falco만 탐지하고 Tetragon이 차단하지 못한 사건. 바로 조치가 필요합니다.")
+
+    b.add("stat", "차단", 6, 0, 6, 5,
+          [inf(summary_url, [("blocked_count", "차단 (건)", "number")])],
+          DS_B, stat_opts(text="value", size=(14, 48)),
+          defaults={"color": fixed(BLUE), "noValue": "0", "thresholds": thresholds((None, BLUE))},
+          desc="Tetragon 인라인 차단(Sigkill·Override) 건수. 선택한 시간 범위 기준.")
+
+    b.add("stat", "공격받은 워크로드", 12, 0, 6, 5,
+          [inf(summary_url, [("attacked_workloads", "공격받음", "number"),
+                             ("total_workloads", "전체 pod", "number")])],
+          DS_B, stat_opts(size=(14, 48)),
+          defaults={"color": fixed("text"), "noValue": "0", "thresholds": thresholds((None, "text"))},
+          overrides=[ov("전체 pod", color=fixed(GREY))],
+          desc="사건이 1건 이상 발생한 pod 수 / 필터에 걸리는 Running pod 수")
+
+    health_map = [{"type": "range", "options": {"from": 1, "to": 1e9, "result": {"text": "정상", "color": GREEN, "index": 0}}},
+                  {"type": "range", "options": {"from": -1e9, "to": 0.9999, "result": {"text": "이상", "color": RED, "index": 1}}}]
+    b.add("stat", "수집 상태", 18, 0, 6, 5,
+          [prom('sum(kube_daemonset_status_number_ready{daemonset=~".*tetragon.*"}) / sum(kube_daemonset_status_desired_number_scheduled{daemonset=~".*tetragon.*"})', "Tetragon", "A"),
+           prom('sum(kube_daemonset_status_number_ready{daemonset=~".*falco.*"}) / sum(kube_daemonset_status_desired_number_scheduled{daemonset=~".*falco.*"})', "Falco", "B"),
+           prom('min(up{job=~".*(alloy|loki|tempo).*"})', "Alloy → Loki / Tempo", "C")],
+          DS_P, stat_opts(fields="", size=(14, 16), orient="horizontal", color="value"),
+          defaults={"mappings": health_map, "noValue": "수신 없음",
+                    "thresholds": thresholds((None, RED), (1, GREEN))},
+          desc="DaemonSet Ready 비율과 Alloy/Loki/Tempo scrape 상태. 1이면 정상입니다.")
+
+    b.add("stat", "경고 단계별 사건 · Sigma level", 0, 5, 24, 4,
+          [inf(summary_url, [("level_" + k + "_count", t, "number") for k, t, _ in LEVELS])],
+          DS_B, stat_opts(size=(14, 32), orient="vertical", color="background"),
+          defaults={"unit": "none", "noValue": "0", "color": fixed(GREY),
+                    "thresholds": thresholds((None, GREY))},
+          overrides=[ov(t, color=fixed(c)) for _, t, c in LEVELS],
+          desc="사건 단계 = 묶인 이벤트(Tetragon 정책·Falco 룰)의 Sigma level 중 가장 높은 값. "
+               "매칭 표는 tefal-backend의 sigma_levels.yaml.")
+
+    queue_cols = [
+        ("time", "시각", "string"), ("level", "단계", "string"), ("status", "상태", "string"),
+        ("workload", "namespace / pod", "string"), ("runtime", "런타임", "string"),
+        ("summary", "행위 요약", "string"), ("mitre_text", "MITRE", "string"),
+        ("src_ip", "출발지 IP", "string"),
+        ("trace_id", "트레이스", "string"), ("trace_id", "AI 분석", "string"),
+        ("trace_id", "trace_id", "string"),
+        ("window_from_ms", "window_from_ms", "number"), ("window_to_ms", "window_to_ms", "number"),
+    ]
+    b.add("table", "사건 큐 · trace 1개 = 사건 1건 (미차단 우선 정렬)", 0, 9, 24, 10,
+          [inf("/incidents?" + INC_Q + "&limit=100", queue_cols)],
+          DS_B, table_opts(),
+          defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}, "inspect": False},
+                    "noValue": "사건 없음"},
+          overrides=[
+              ov("시각", custom__width=100),
+              ov("단계", custom__width=90, mappings=[LEVEL_MAP],
+                 custom__cellOptions={"type": "color-background", "mode": "basic"}),
+              ov("상태", custom__width=90, mappings=[STATUS_MAP],
+                 custom__cellOptions={"type": "color-background", "mode": "basic"}),
+              ov("런타임", custom__width=80),
+              ov("MITRE", custom__width=110),
+              ov("출발지 IP", custom__width=140, color=fixed(BLUE),
+                 custom__cellOptions={"type": "color-text"},
+                 links=[{"title": "위협 인텔리전스에서 보기",
+                         "url": "/d/" + UIDS["ti"] + "?var-ip=${__value.raw}&from=now-24h&to=now"}]),
+              ov("트레이스", custom__width=90, mappings=label_map("트레이스"),
+                 links=[{"title": "Tempo에서 트레이스 열기", "url": explore_tempo("${__value.raw}"),
+                         "targetBlank": True}]),
+              ov("AI 분석", custom__width=90, mappings=label_map("AI 분석"),
+                 links=[{"title": "사건 상세 + AI 해석", "url": INCIDENT_LINK}]),
+              hide("trace_id"), hide("window_from_ms"), hide("window_to_ms"),
+          ],
+          desc="출처: tefal-backend /incidents. 미차단이 먼저, 그다음 최신순. 단계는 Sigma level, 판정 중 = Falco 경보 후 Tetragon 결과 대기.")
+
+    b.add("barchart", "워크로드별 사건 · 패치·격리 우선순위", 0, 19, 12, 8,
+          [inf("/incidents/by-workload?" + INC_Q,
+               [("pod", "pod", "string"), ("blocked", "차단", "number"), ("unblocked", "미차단", "number")])],
+          DS_B,
+          {"orientation": "horizontal", "xField": "pod", "stacking": "normal",
+           "showValue": "auto", "barWidth": 0.5, "groupWidth": 0.7, "fullHighlight": False,
+           "legend": {"showLegend": True, "displayMode": "list", "placement": "bottom"},
+           "tooltip": {"mode": "multi", "sort": "none"}, "xTickLabelRotation": 0},
+          defaults={"custom": {"fillOpacity": 90, "lineWidth": 0, "axisPlacement": "auto"},
+                    "unit": "none", "decimals": 0},
+          overrides=[ov("차단", color=fixed(BLUE)), ov("미차단", color=fixed(RED))],
+          desc="미차단이 많은 워크로드부터 패치·격리합니다.")
+
+    b.add("timeseries", "시간대별 사건 (5분 단위)", 12, 19, 12, 8,
+          [inf("/incidents/timeseries?" + INC_Q + "&interval=5m",
+               [("time_ms", "time", "timestamp_epoch"), ("blocked", "차단", "number"),
+                ("unblocked", "미차단", "number")])],
+          DS_B,
+          {"legend": {"showLegend": True, "displayMode": "list", "placement": "bottom"},
+           "tooltip": {"mode": "multi", "sort": "none"}},
+          defaults={"custom": {"drawStyle": "bars", "fillOpacity": 90, "lineWidth": 0,
+                               "barAlignment": 0, "stacking": {"mode": "normal", "group": "A"},
+                               "showPoints": "never"},
+                    "unit": "none", "decimals": 0, "min": 0},
+          overrides=[ov("차단", color=fixed(BLUE)), ov("미차단", color=fixed(RED))])
+
+    b.add("table", "정책 상태 · 방어가 제대로 도는가", 0, 27, 24, 9,
+          [inf("/policies/stats?" + TR + "&namespace=${namespace}",
+               [("policy", "정책", "string"), ("tag", "구분", "string"), ("layer", "계층", "string"),
+                ("action", "액션", "string"), ("hits", "히트", "number"),
+                ("fp_note", "오탐 의심", "string")])],
+          DS_B, table_opts(),
+          defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}}},
+          overrides=[
+              ov("구분", custom__width=110), ov("계층", custom__width=170), ov("액션", custom__width=130),
+              ov("히트", custom__width=70, custom__align="right"),
+              ov("오탐 의심", color=fixed(ORANGE), custom__cellOptions={"type": "color-text"},
+                 mappings=[{"type": "special", "options": {"match": "empty", "result": {"text": "—", "color": GREY, "index": 0}}},
+                           {"type": "special", "options": {"match": "null", "result": {"text": "—", "color": GREY, "index": 1}}},
+                           {"type": "regex", "options": {"pattern": "(.+)", "result": {"text": "▲ $1", "index": 2}}}]),
+          ],
+          desc="오탐 의심 = 정상 워크로드 동작에서 같은 정책이 반복해서 맞는 경우")
+
+    variables = [
+        {"type": "query", "name": "namespace", "label": "namespace", "hide": 0, "datasource": DS_P,
+         "query": {"query": "label_values(kube_pod_info, namespace)", "refId": "ns"},
+         "definition": "label_values(kube_pod_info, namespace)", "refresh": 1, "sort": 1,
+         "includeAll": True, "allValue": "All", "multi": False,
+         "current": {"text": "All", "value": "$__all"}, "options": []},
+        custom("runtime", "runtime", "Java,PHP,Node", multi=True),
+        custom("status", "상태", "차단됨 : blocked,미차단 : unblocked,판정 중 : pending"),
+        custom("level", "단계", ",".join(f"{t} : {k}" for k, t, _ in LEVELS), multi=True),
+    ]
+    return dashboard("overview", "운영 현황", b, variables, refresh="5s",
+                     desc="TEFAL 메인 · 사건 큐, 차단 현황, 정책 상태")
+
+
+# =====================================================================
+# ② 사건 상세 + AI 해석
+# =====================================================================
+def incident():
+    b = Builder()
+    b.add("stat", "사건 요약", 0, 0, 24, 4,
+          [inf("/incidents/${trace_id}",
+               [("status_text", "상태", "string"), ("workload", "워크로드", "string"),
+                ("runtime_detail", "런타임", "string"), ("time_text", "시작", "string"),
+                ("mitre_text", "MITRE", "string"), ("src_ip", "출발지 IP", "string")])],
+          DS_B, {**stat_opts(fields="/.*/", size=(12, 18), color="none"), "colorMode": "none"},
+          defaults={"noValue": "trace_id를 입력하세요"},
+          links=[{"title": "← 사건 큐", "url": "/d/" + UIDS["overview"] + "?from=now-1h&to=now"}])
+
+    tv = b.add("traces", "Trace View · 계층별 인과 흐름", 0, 4, 15, 15,
+               # Grafana 화면의 Tempo 데이터소스는 queryType "traceId"를 실행하지 않는다(패널이 계속 로딩).
+               # traceql 쿼리에 trace ID만 넣으면 화면이 trace 조회로 바꿔 보낸다.
+               [{"refId": "A", "datasource": DS_T, "queryType": "traceql", "query": "${trace_id}"}],
+               DS_T, {},
+               desc="출처: Tempo. span을 누르면 binary/args, policy·action, exec_id/parent를 볼 수 있습니다. "
+                    "계층: app·uprobe → proc → kernel·LSM → falco")
+    # Grafana는 trace ID 조회에도 대시보드 시간 범위를 붙인다. 사건 시각 ±5분으로는 늦게 기록된
+    # trace(백엔드 재시작·재생성으로 지난 사건을 다시 기록한 경우)를 못 찾으므로 이 패널만 최근 7일로 찾는다.
+    tv["timeFrom"] = "7d"
+    tv["hideTimeOverride"] = True
+
+    b.add("marcusolsson-dynamictext-panel", "AI 해석 · 대응 가이드", 15, 4, 9, 15,
+          [inf("/ai/analysis/${trace_id}?refresh=${ai_refresh}", [("markdown", "markdown", "string")])],
+          DS_B,
+          {"renderMode": "everyRow", "content": "{{{markdown}}}", "defaultContent": "분석 결과가 없습니다.",
+           "editors": ["helpers"], "contentPartials": [], "helpers": "", "styles": "",
+           "wrap": True, "editor": {"language": "markdown", "format": "auto"}},
+          desc="Gemini가 근거 로그를 바탕으로 생성. 다시 분석하려면 상단 변수 'AI 다시 분석'을 '예'로 바꾸세요.")
+
+    b.add("logs", "원본 로그 · 이 사건에 속한 이벤트", 0, 19, 16, 9,
+          # `"exec_id":"<값>"`로 거른다: process·parent의 exec_id와 parent_exec_id에 모두 맞고,
+          # 값이 비면(사건 미선택) `"exec_id":""`가 되어 아무 줄에도 맞지 않는다
+          [{"refId": "A", "datasource": DS_L, "expr": '${loki_selector} |= `"exec_id":"${exec_id}"`', "queryType": "range"},
+           {"refId": "B", "datasource": DS_L, "expr": '${loki_selector} |= `"exec_id":"${parent_exec_id}"`', "queryType": "range"}],
+          DS_L,
+          {"showTime": True, "showLabels": False, "showCommonLabels": False, "wrapLogMessage": True,
+           "prettifyLogMessage": False, "enableLogDetails": True, "dedupStrategy": "exact",
+           "sortOrder": "Ascending"},
+          desc="출처: Loki · exec_id 와 parent exec_id 로 필터")
+
+    b.add("stat", "출발지 IP 요약", 16, 19, 8, 9,
+          [inf("/ti/ip/${src_ip}",
+               [("ip", "IP", "string"), ("country_asn", "국가 / ASN", "string"),
+                ("abuse_score", "AbuseIPDB 점수", "number"), ("vt_text", "VirusTotal", "string")])],
+          DS_B, {**stat_opts(fields="/.*/", size=(12, 18)), "orientation": "horizontal"},
+          defaults={"color": fixed("text"), "noValue": "사설 IP 또는 정보 없음",
+                    "thresholds": thresholds((None, "text"))},
+          overrides=[ov("AbuseIPDB 점수", unit="none", max=100, color={"mode": "thresholds"},
+                        thresholds=thresholds((None, GREY), (25, ORANGE), (75, RED)))],
+          links=[{"title": "TI 탭에서 보기 →",
+                  "url": "/d/" + UIDS["ti"] + "?var-ip=${src_ip}&from=now-24h&to=now"}])
+
+    variables = [
+        textbox("trace_id", "incident (trace_id)"),
+        custom("ai_refresh", "AI 다시 분석", "아니오 : false,예 : true", include_all=False, default_all=False)
+        | {"current": {"text": "아니오", "value": "false"}},
+        inf_var("src_ip", "/incidents/${trace_id}", "src_ip"),
+        inf_var("exec_id", "/incidents/${trace_id}", "exec_id"),
+        inf_var("parent_exec_id", "/incidents/${trace_id}", "parent_exec_id"),
+        const("loki_selector", '{namespace="kube-system", container="export-stdout"}', "Loki 셀렉터"),
+    ]
+    return dashboard("incident", "사건 상세", b, variables, time_from="now-1h",
+                     desc="사건 1건의 Trace, 원본 로그, AI 해석. 사건 큐에서 들어오면 사건 시각 ±5분으로 열립니다.")
+
+
+# =====================================================================
+# ③ 위협 인텔리전스
+# =====================================================================
+def threat_intel():
+    b = Builder()
+    ti_cols = [("ip", "IP", "string"), ("country", "국가", "string"), ("asn_isp", "ASN / ISP", "string"),
+               ("abuse_score", "Abuse 점수", "number"), ("abuse_reports", "신고 수", "number"),
+               ("vt_text", "VT 악성", "string"), ("related_incidents", "관련 사건", "number"),
+               ("last_checked", "최근 조회", "string"),
+               ("lat", "lat", "number"), ("lon", "lon", "number")]
+    ips_url = "/ti/ips?" + TR + "&min_abuse=${min_abuse}"
+    abuse_thr = thresholds((None, GREY), (25, ORANGE), (75, RED))
+
+    b.add("geomap", "출발지 IP 위치 · 색 = Abuse 점수", 0, 0, 16, 12,
+          [inf(ips_url, ti_cols)], DS_B,
+          {"view": {"id": "zero", "lat": 20, "lon": 10, "zoom": 1.6, "allLayers": True},
+           "controls": {"showZoom": True, "mouseWheelZoom": True, "showAttribution": True},
+           "basemap": {"type": "carto", "name": "basemap", "config": {"theme": "dark", "showLabels": True}},
+           "layers": [{
+               "type": "markers", "name": "출발지 IP", "tooltip": True,
+               "location": {"mode": "coords", "latitude": "lat", "longitude": "lon"},
+               "config": {"showLegend": True, "style": {
+                   "size": {"fixed": 9, "min": 4, "max": 15},
+                   "color": {"field": "Abuse 점수", "fixed": GREY},
+                   "opacity": 0.9, "symbol": {"mode": "fixed", "fixed": "img/icons/marker/circle.svg"},
+                   "text": {"mode": "field", "field": "IP", "fixed": ""},
+                   "textConfig": {"fontSize": 12, "offsetX": 14, "offsetY": 0,
+                                  "textAlign": "left", "textBaseline": "middle"}}}}],
+           "tooltip": {"mode": "details"}},
+          defaults={"color": {"mode": "thresholds"}, "thresholds": abuse_thr, "min": 0, "max": 100},
+          desc="Geomap 패널 · GeoIP (MaxMind). 75 이상 고위험(빨강), 25–74(주황), 25 미만/정보 없음(회색). "
+               "사설 IP(10/8, 172.16/12, 192.168/16)는 조회 대상에서 제외합니다.")
+
+    sum_url = "/ti/summary?" + TR
+    b.add("stat", "조회된 공인 IP", 16, 0, 4, 4, [inf(sum_url, [("public_ip_count", "IP", "number")])],
+          DS_B, stat_opts(text="value"), defaults={"color": fixed("text"), "thresholds": thresholds((None, "text"))})
+    b.add("stat", "고위험 (≥75)", 20, 0, 4, 4, [inf(sum_url, [("high_risk_count", "IP", "number")])],
+          DS_B, stat_opts(text="value"), defaults={"color": fixed(RED), "thresholds": thresholds((None, RED))})
+    b.add("stat", "AbuseIPDB 사용량", 16, 4, 4, 4,
+          [inf(sum_url, [("abuseipdb_used", "사용", "number"), ("abuseipdb_limit", "일일 한도", "number")])],
+          DS_B, stat_opts(size=(11, 22)), defaults={"color": fixed("text"), "thresholds": thresholds((None, "text"))},
+          overrides=[ov("일일 한도", color=fixed(GREY))])
+    b.add("stat", "VirusTotal 사용량", 20, 4, 4, 4,
+          [inf(sum_url, [("virustotal_used", "사용", "number"), ("virustotal_limit", "일일 한도", "number")])],
+          DS_B, stat_opts(size=(11, 22)), defaults={"color": fixed("text"), "thresholds": thresholds((None, "text"))},
+          overrides=[ov("일일 한도", color=fixed(GREY))])
+    b.add("stat", "캐시", 16, 8, 8, 4,
+          [inf(sum_url, [("cache_hit_rate", "적중률", "number"), ("cache_ttl_hours", "재조회 간격 (시간)", "number")])],
+          DS_B, stat_opts(size=(11, 22)),
+          defaults={"color": fixed("text"), "thresholds": thresholds((None, "text"))},
+          overrides=[ov("적중률", unit="percentunit", decimals=0)],
+          desc="같은 IP는 TTL 동안 재조회하지 않습니다.")
+
+    b.add("table", "IP 평판 · AbuseIPDB + VirusTotal", 0, 12, 24, 8,
+          [inf(ips_url, ti_cols)], DS_B, table_opts(sort=[{"displayName": "Abuse 점수", "desc": True}]),
+          defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}}},
+          overrides=[
+              ov("IP", custom__width=150, links=[{"title": "이 IP 상세 보기",
+                                                 "url": "/d/" + UIDS["ti"] + "?var-ip=${__value.raw}&${__url_time_range}"}]),
+              ov("국가", custom__width=60),
+              ov("Abuse 점수", custom__width=220, min=0, max=100, color={"mode": "thresholds"},
+                 thresholds=abuse_thr,
+                 custom__cellOptions={"type": "gauge", "mode": "basic", "valueDisplayMode": "text"}),
+              ov("신고 수", custom__width=80), ov("VT 악성", custom__width=90),
+              ov("관련 사건", custom__width=90, color=fixed(BLUE), custom__cellOptions={"type": "color-text"},
+                 links=[{"title": "운영 현황 사건 큐", "url": "/d/" + UIDS["overview"] + "?${__url_time_range}"}]),
+              ov("최근 조회", custom__width=90),
+              hide("lat"), hide("lon"),
+          ],
+          desc="출처: tefal-backend /ti (Infinity)")
+
+    ip_url = "/ti/ip/${ip}"
+    b.add("stat", "선택 IP 상세 · ${ip}", 0, 20, 12, 5,
+          [inf(ip_url, [("abuse_score", "Abuse 신뢰 점수", "number"), ("last_reported", "최근 신고", "string"),
+                        ("usage_type", "용도", "string"), ("is_tor", "Tor 노드", "string")])],
+          DS_B, stat_opts(fields="/.*/", size=(12, 18)),
+          defaults={"color": fixed("text"), "noValue": "IP 조회 변수에 공인 IP를 입력하세요",
+                    "thresholds": thresholds((None, "text"))},
+          overrides=[ov("Abuse 신뢰 점수", color={"mode": "thresholds"}, thresholds=abuse_thr),
+                     ov("Tor 노드", mappings=[{"type": "value", "options": {
+                         "true": {"text": "예", "color": RED, "index": 0},
+                         "false": {"text": "아니오", "index": 1}}}])])
+    b.add("stat", "AbuseIPDB 신고 분류 · VirusTotal 판정", 0, 25, 12, 4,
+          [inf(ip_url, [("abuse_categories_text", "신고 분류", "string"),
+                        ("vt_malicious", "악성", "number"), ("vt_suspicious", "의심", "number"),
+                        ("vt_harmless", "무해", "number"), ("vt_undetected", "미분류", "number")])],
+          DS_B, stat_opts(fields="/.*/", size=(11, 16)),
+          defaults={"color": fixed("text"), "noValue": "—", "thresholds": thresholds((None, "text"))},
+          overrides=[ov("악성", color=fixed(RED)), ov("의심", color=fixed(ORANGE))])
+
+    b.add("table", "파일 해시 조회 · 업로드된 웹셸", 12, 20, 12, 9,
+          [inf("/ti/files?" + TR + "&ip=${ip}",
+               [("path", "파일", "string"), ("sha256", "SHA-256", "string"),
+                ("vt_malicious", "VT 악성", "number"), ("message", "판정", "string")])],
+          DS_B, table_opts(),
+          defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}, "inspect": True},
+                    "noValue": "업로드된 파일 없음"},
+          overrides=[ov("VT 악성", custom__width=80, color={"mode": "thresholds"},
+                        thresholds=thresholds((None, BLUE), (1, RED)),
+                        custom__cellOptions={"type": "color-text"}),
+                     ov("SHA-256", custom__width=200)],
+          links=[{"title": "관련 사건 보기 →", "url": "/d/" + UIDS["overview"] + "?${__url_time_range}"}],
+          desc="VirusTotal. 기록이 없어도 Tetragon이 행위 기준으로 차단했을 수 있습니다.")
+
+    variables = [textbox("ip", "IP 조회"), textbox("min_abuse", "최소 Abuse 점수", "0")]
+    return dashboard("ti", "위협 인텔리전스", b, variables, time_from="now-24h",
+                     desc="출발지 IP 평판(AbuseIPDB·VirusTotal), GeoIP, 파일 해시")
+
+
+# =====================================================================
+# ④ 인프라
+# =====================================================================
+def infra():
+    b = Builder()
+    big = stat_opts(size=(12, 40))
+    b.add("stat", "노드", 0, 0, 6, 4,
+          [prom('sum(kube_node_status_condition{condition="Ready",status="true"})', "Ready", "A"),
+           prom('count(kube_node_info)', "전체", "B")],
+          DS_P, big, defaults={"color": fixed(GREEN), "thresholds": thresholds((None, GREEN))},
+          overrides=[ov("전체", color=fixed(GREY))])
+    b.add("stat", "보호 대상 워크로드", 6, 0, 6, 4,
+          [prom('count(kube_pod_status_phase{namespace=~"${watch_ns}",phase="Running"} == 1)', "Running pod", "A")],
+          DS_P, big, defaults={"color": fixed("text"), "thresholds": thresholds((None, "text"))},
+          desc="namespace ${watch_ns} 의 Running pod 수")
+    b.add("stat", "적용된 정책", 12, 0, 6, 4,
+          [inf("/infra/policies", [("total", "전체", "number"), ("tracing_policies", "TracingPolicy", "number"),
+                                   ("falco_custom_rules", "Falco 커스텀", "number")])],
+          DS_B, big, defaults={"color": fixed("text"), "thresholds": thresholds((None, "text"))},
+          overrides=[ov("TracingPolicy", color=fixed(GREY)), ov("Falco 커스텀", color=fixed(GREY))])
+    b.add("stat", "격리된 워크로드", 18, 0, 6, 4,
+          [inf("/infra/policies", [("isolated_workloads", "CiliumNetworkPolicy", "number")])],
+          DS_B, big, defaults={"color": {"mode": "thresholds"},
+                               "thresholds": thresholds((None, "text"), (1, ORANGE))},
+          desc="격리용 CiliumNetworkPolicy(tefal.io/isolate=true)가 걸린 pod 수")
+
+    b.add("table", "노드", 0, 4, 12, 6,
+          [inf("/infra/nodes", [("node", "노드", "string"), ("ready", "상태", "string"),
+                                ("role", "역할", "string"), ("kernel", "커널", "string"),
+                                ("bpf_lsm", "BPF LSM", "string"), ("pods", "Pod", "number")])],
+          DS_B, table_opts(),
+          defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}}},
+          overrides=[
+              ov("상태", custom__cellOptions={"type": "color-text"}, mappings=[{"type": "value", "options": {
+                  "true": {"text": "● Ready", "color": GREEN, "index": 0},
+                  "false": {"text": "● NotReady", "color": RED, "index": 1}}}]),
+              ov("BPF LSM", custom__cellOptions={"type": "color-text"}, mappings=[{"type": "value", "options": {
+                  "true": {"text": "활성", "color": GREEN, "index": 0},
+                  "false": {"text": "비활성", "color": RED, "index": 1}}}]),
+          ])
+
+    b.add("bargauge", "노드 리소스", 12, 4, 12, 6,
+          [prom('100 * (1 - avg by (nodename) (rate(node_cpu_seconds_total{mode="idle"}[5m]) '
+                '* on(instance) group_left(nodename) node_uname_info))', "{{nodename}} · CPU", "A"),
+           prom('100 * (1 - avg by (nodename) ((node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) '
+                '* on(instance) group_left(nodename) node_uname_info))', "{{nodename}} · 메모리", "B")],
+          DS_P,
+          {"orientation": "horizontal", "displayMode": "basic", "showUnfilled": True,
+           "valueMode": "color", "namePlacement": "left", "sizing": "auto", "minVizHeight": 10,
+           "reduceOptions": {"values": False, "calcs": ["lastNotNull"], "fields": ""}},
+          defaults={"unit": "percent", "min": 0, "max": 100, "decimals": 0,
+                    "color": {"mode": "thresholds"},
+                    "thresholds": thresholds((None, BLUE), (80, ORANGE), (90, RED))},
+          desc="node-exporter 기준 CPU / 메모리 사용률")
+
+    b.add("table", "워크로드 보호 현황", 0, 10, 16, 11,
+          [inf("/infra/workloads?namespace=${watch_ns}",
+               [("pod_label", "pod", "string"), ("status", "상태", "string"), ("restarts", "재시작", "number"),
+                ("node", "노드", "string"), ("tetragon_policy", "Tetragon 정책", "string"),
+                ("falco", "Falco", "string"), ("network", "네트워크", "string")])],
+          DS_B, table_opts(),
+          defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}}, "noValue": "—"},
+          overrides=[
+              ov("상태", custom__width=110, custom__cellOptions={"type": "color-text"},
+                 mappings=[{"type": "value", "options": {"Running": {"text": "● Running", "color": GREEN, "index": 0}}},
+                           {"type": "regex", "options": {"pattern": "(.+)", "result": {"text": "● $1", "color": RED, "index": 1}}}]),
+              ov("재시작", custom__width=70, color={"mode": "thresholds"},
+                 thresholds=thresholds((None, "text"), (1, ORANGE)), custom__cellOptions={"type": "color-text"}),
+              ov("네트워크", mappings=[{"type": "special", "options": {"match": "empty", "result": {"text": "—", "index": 0}}}]),
+              ov("Tetragon 정책", mappings=[{"type": "special", "options": {"match": "empty", "result": {"text": "—", "index": 0}}}]),
+          ],
+          desc="K8s API(pod 상태·재시작·노드) + 정책 매핑(TracingPolicy, Falco, CiliumNetworkPolicy)")
+
+    b.add("table", "보안·관측 컴포넌트", 16, 10, 8, 11,
+          [inf("/infra/components", [("name", "컴포넌트", "string"), ("kind", "종류", "string"),
+                                     ("ready_text", "Ready", "string")])],
+          DS_B, table_opts(),
+          defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}}},
+          overrides=[ov("종류", custom__width=80, color=fixed(GREY), custom__cellOptions={"type": "color-text"}),
+                     ov("Ready", custom__width=70, custom__align="right",
+                        custom__cellOptions={"type": "color-text"},
+                        mappings=[{"type": "regex", "options": {"pattern": "^(\\d+)/\\1$", "result": {"color": GREEN, "index": 0}}},
+                                  {"type": "regex", "options": {"pattern": ".*", "result": {"color": RED, "index": 1}}}])])
+
+    b.add("table", "네트워크 · 정책에 막힌 흐름 (Hubble)", 0, 21, 12, 7,
+          [inf("/network/drops?" + TR + "&namespace=${watch_ns}&limit=20",
+               [("src_pod", "출발 pod", "string"), ("dst", "목적지", "string"),
+                ("count", "횟수", "number"), ("verdict", "판정", "string")])],
+          DS_B, table_opts(),
+          defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}}, "noValue": "막힌 흐름 없음"},
+          overrides=[ov("판정", custom__width=100, color=fixed(ORANGE), custom__cellOptions={"type": "color-text"}),
+                     ov("횟수", custom__width=70)],
+          desc="Hubble Relay 에서 verdict=DROPPED 흐름을 모은 결과")
+
+    b.add("text", "관리 도구", 12, 21, 12, 7, [], None,
+          {"mode": "html", "content":
+           '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">'
+           '<a href="${hubble_url}" target="_blank" style="border:1px solid #5794F2;border-radius:4px;padding:6px 12px;color:#5794F2">Hubble UI · 서비스 맵 ↗</a>'
+           '<a href="${headlamp_url}" target="_blank" style="border:1px solid #5794F2;border-radius:4px;padding:6px 12px;color:#5794F2">Headlamp · 격리·재시작 ↗</a>'
+           '</div>'
+           '<p style="opacity:0.75">Grafana는 조회 전용입니다. 조작은 별도 로그인과 최소 권한이 걸린 Headlamp에서만 합니다.</p>'})
+    b.panels[-1].pop("datasource"); b.panels[-1].pop("targets")
+
+    variables = [const("watch_ns", "vuln-lab", "감시 namespace")]
+    return dashboard("infra", "인프라", b, variables, refresh="30s",
+                     desc="노드, 워크로드 보호 현황, 보안·관측 컴포넌트, Hubble 차단 흐름")
+
+
+os.makedirs(OUT, exist_ok=True)
+for name, fn in [("01-overview", overview), ("02-incident", incident),
+                 ("03-threat-intel", threat_intel), ("04-infra", infra)]:
+    d = fn()
+    with open(os.path.join(OUT, name + ".json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(d, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    print(name, "panels:", len(d["panels"]))

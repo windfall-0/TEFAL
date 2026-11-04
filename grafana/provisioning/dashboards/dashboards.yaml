@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: tefal
+    orgId: 1
+    folder: TEFAL
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false        # 조회 전용. 수정은 저장소 JSON에서 한다.
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards/tefal
+      foldersFromFilesStructure: false
