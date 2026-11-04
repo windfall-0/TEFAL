@@ -129,10 +129,10 @@
         "name": "hubble_url",
         "label": "Hubble UI URL",
         "hide": 2,
-        "query": "http://hubble.tefal.local",
+        "query": "http://192.168.0.200:31235",
         "current": {
-          "text": "http://hubble.tefal.local",
-          "value": "http://hubble.tefal.local"
+          "text": "http://192.168.0.200:31235",
+          "value": "http://192.168.0.200:31235"
         },
         "options": []
       },
@@ -141,10 +141,10 @@
         "name": "headlamp_url",
         "label": "Headlamp URL",
         "hide": 2,
-        "query": "http://headlamp.tefal.local",
+        "query": "http://192.168.0.200:31240",
         "current": {
-          "text": "http://headlamp.tefal.local",
-          "value": "http://headlamp.tefal.local"
+          "text": "http://192.168.0.200:31240",
+          "value": "http://192.168.0.200:31240"
         },
         "options": []
       }

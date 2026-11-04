@@ -117,10 +117,10 @@
         "name": "hubble_url",
         "label": "Hubble UI URL",
         "hide": 2,
-        "query": "http://hubble.tefal.local",
+        "query": "http://192.168.0.200:31235",
         "current": {
-          "text": "http://hubble.tefal.local",
-          "value": "http://hubble.tefal.local"
+          "text": "http://192.168.0.200:31235",
+          "value": "http://192.168.0.200:31235"
         },
         "options": []
       },
@@ -129,10 +129,10 @@
         "name": "headlamp_url",
         "label": "Headlamp URL",
         "hide": 2,
-        "query": "http://headlamp.tefal.local",
+        "query": "http://192.168.0.200:31240",
         "current": {
-          "text": "http://headlamp.tefal.local",
-          "value": "http://headlamp.tefal.local"
+          "text": "http://192.168.0.200:31240",
+          "value": "http://192.168.0.200:31240"
         },
         "options": []
       }
@@ -766,8 +766,60 @@
             ]
           }
         },
-        "overrides": []
-      }
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*메모리$"
+            },
+            "properties": [
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#B877D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#FFB357",
+                      "value": 80
+                    },
+                    {
+                      "color": "#FF7383",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "Time",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "Time": 0,
+              "k8s-master · CPU": 1,
+              "k8s-master · 메모리": 2,
+              "k8s-worker1 · CPU": 3,
+              "k8s-worker1 · 메모리": 4,
+              "k8s-worker2 · CPU": 5,
+              "k8s-worker2 · 메모리": 6
+            }
+          }
+        }
+      ]
     },
     {
       "id": 7,
@@ -1168,7 +1220,7 @@
       "id": 9,
       "type": "table",
       "title": "네트워크 · 정책에 막힌 흐름 (Hubble)",
-      "description": "Hubble Relay 에서 verdict=DROPPED 흐름을 모은 결과. 아직 연결 전이라 비어 있습니다",
+      "description": "Hubble Relay GetFlows 에서 verdict=DROPPED 이고 감시 namespace pod 가 출발지나 목적지인 흐름. 같은 출발→목적지·사유는 합쳐서 셉니다. 각 노드 Hubble 링 버퍼에 남은 흐름만 보이므로 오래된 구간은 비어 있을 수 있습니다",
       "gridPos": {
         "x": 0,
         "y": 21,
@@ -1198,8 +1250,13 @@
           "root_selector": "",
           "columns": [
             {
+              "selector": "time_ms",
+              "text": "마지막",
+              "type": "timestamp_epoch"
+            },
+            {
               "selector": "src_pod",
-              "text": "출발 pod",
+              "text": "출발",
               "type": "string"
             },
             {
@@ -1208,14 +1265,19 @@
               "type": "string"
             },
             {
+              "selector": "reason",
+              "text": "사유",
+              "type": "string"
+            },
+            {
+              "selector": "policy",
+              "text": "정책",
+              "type": "string"
+            },
+            {
               "selector": "count",
               "text": "횟수",
               "type": "number"
-            },
-            {
-              "selector": "verdict",
-              "text": "판정",
-              "type": "string"
             }
           ],
           "filters": []
@@ -1236,18 +1298,34 @@
               "type": "auto"
             }
           },
-          "noValue": "Hubble 연결 전 (다음 단계)"
+          "noValue": "막힌 흐름 없음 (Hubble 버퍼 기준)"
         },
         "overrides": [
           {
             "matcher": {
               "id": "byName",
-              "options": "판정"
+              "options": "마지막"
             },
             "properties": [
               {
                 "id": "custom.width",
-                "value": 100
+                "value": 150
+              },
+              {
+                "id": "unit",
+                "value": "dateTimeAsLocal"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "사유"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
               },
               {
                 "id": "color",
@@ -1272,7 +1350,11 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 70
+                "value": 60
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
               }
             ]
           }
@@ -1283,10 +1365,12 @@
           "id": "organize",
           "options": {
             "indexByName": {
-              "출발 pod": 0,
-              "목적지": 1,
-              "횟수": 2,
-              "판정": 3
+              "마지막": 0,
+              "출발": 1,
+              "목적지": 2,
+              "사유": 3,
+              "정책": 4,
+              "횟수": 5
             }
           }
         }

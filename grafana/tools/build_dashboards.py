@@ -10,6 +10,8 @@ DS_T = {"type": "tempo", "uid": "tempo-ds"}
 
 BLUE, RED, ORANGE, GREEN, GREY = "#5794F2", "#FF7383", "#FFB357", "#73BF69", "#8E8E8E"
 
+NODES = ("k8s-master", "k8s-worker1", "k8s-worker2")  # 192.168.0.200 클러스터 (노드 리소스 막대 순서)
+
 UIDS = {
     "overview": "tefal-overview",
     "incident": "tefal-incident",
@@ -147,8 +149,9 @@ def inf_var(name, url, selector):
 
 
 COMMON_VARS = [
-    const("hubble_url", "http://hubble.tefal.local", "Hubble UI URL"),
-    const("headlamp_url", "http://headlamp.tefal.local", "Headlamp URL"),
+    # 192.168.0.200 클러스터 NodePort (deploy/README.md). 인증 없는 Hubble UI는 내부망에서만 쓴다
+    const("hubble_url", "http://192.168.0.200:31235", "Hubble UI URL"),
+    const("headlamp_url", "http://192.168.0.200:31240", "Headlamp URL"),
 ]
 
 
@@ -573,6 +576,18 @@ def infra():
           defaults={"unit": "percent", "min": 0, "max": 100, "decimals": 0,
                     "color": {"mode": "thresholds"},
                     "thresholds": thresholds((None, BLUE), (80, ORANGE), (90, RED))},
+          # 메모리 막대는 보라색 (CPU는 기본 파란색). 행 단위 색을 쓰려면 seriesToRows가 아닌 join이어야 한다
+          overrides=[{"matcher": {"id": "byRegexp", "options": ".*메모리$"},
+                      "properties": [{"id": "thresholds",
+                                      "value": thresholds((None, "#B877D9"), (80, ORANGE), (90, RED))}]}],
+          # 노드별로 CPU → 메모리 순: 시계열을 Time으로 합친 뒤 순서를 지정한다.
+          # organize의 이름 자동 정렬은 로케일 비교라 한글 "메모리"가 "CPU"보다 앞에 온다 → 노드 목록으로 직접 지정.
+          # 목록에 없는 노드는 뒤에 붙는다
+          transformations=[
+              {"id": "joinByField", "options": {"byField": "Time", "mode": "outer"}},
+              {"id": "organize", "options": {"indexByName": {"Time": 0, **{
+                  f"{n} · {m}": 1 + i * 2 + j for i, n in enumerate(NODES) for j, m in enumerate(("CPU", "메모리"))}}}},
+          ],
           desc="node-exporter 기준 CPU / 메모리 사용률")
 
     b.add("table", "워크로드 보호 현황", 0, 10, 16, 11,
@@ -606,14 +621,16 @@ def infra():
 
     b.add("table", "네트워크 · 정책에 막힌 흐름 (Hubble)", 0, 21, 12, 7,
           [inf("/network/drops?" + TR + "&namespace=${watch_ns}&limit=20",
-               [("src_pod", "출발 pod", "string"), ("dst", "목적지", "string"),
-                ("count", "횟수", "number"), ("verdict", "판정", "string")])],
+               [("time_ms", "마지막", "timestamp_epoch"), ("src_pod", "출발", "string"), ("dst", "목적지", "string"),
+                ("reason", "사유", "string"), ("policy", "정책", "string"), ("count", "횟수", "number")])],
           DS_B, table_opts(),
           defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}},
-                    "noValue": "Hubble 연결 전 (다음 단계)"},
-          overrides=[ov("판정", custom__width=100, color=fixed(ORANGE), custom__cellOptions={"type": "color-text"}),
-                     ov("횟수", custom__width=70)],
-          desc="Hubble Relay 에서 verdict=DROPPED 흐름을 모은 결과. 아직 연결 전이라 비어 있습니다")
+                    "noValue": "막힌 흐름 없음 (Hubble 버퍼 기준)"},
+          overrides=[ov("마지막", custom__width=150, unit="dateTimeAsLocal"),
+                     ov("사유", custom__width=130, color=fixed(ORANGE), custom__cellOptions={"type": "color-text"}),
+                     ov("횟수", custom__width=60, custom__align="right")],
+          desc="Hubble Relay GetFlows 에서 verdict=DROPPED 이고 감시 namespace pod 가 출발지나 목적지인 흐름. "
+               "같은 출발→목적지·사유는 합쳐서 셉니다. 각 노드 Hubble 링 버퍼에 남은 흐름만 보이므로 오래된 구간은 비어 있을 수 있습니다")
 
     b.add("text", "관리 도구", 12, 21, 12, 7, [], None,
           {"mode": "html", "content":
