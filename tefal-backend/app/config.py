@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     prometheus_url: str = "http://kube-prometheus-stack-prometheus.monitoring:9090"
     loki_tetragon_selector: str = '{namespace="kube-system", container="export-stdout"}'
 
+    # K8s API (④ 인프라, 5.5). pod의 ServiceAccount 토큰을 쓴다
+    k8s_api_url: str = "https://kubernetes.default.svc"
+    k8s_enabled: bool = True
+    falco_rules_configmap: str = "falco/falco-rules"  # <namespace>/<name>, Falco 커스텀 룰
+
     # 사건 생성 (4장)
     collector_enabled: bool = True
     collect_interval_sec: float = 5.0

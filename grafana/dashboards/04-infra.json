@@ -513,7 +513,7 @@
       "id": 5,
       "type": "table",
       "title": "노드",
-      "description": "",
+      "description": "K8s API. BPF LSM: 노드 라벨 tefal.io/bpf-lsm, 없으면 최근 7일 Tetragon process_lsm 이벤트 관측 여부",
       "gridPos": {
         "x": 0,
         "y": 4,
@@ -654,6 +654,11 @@
                         "text": "비활성",
                         "color": "#FF7383",
                         "index": 1
+                      },
+                      "unknown": {
+                        "text": "확인 안 됨",
+                        "color": "#8E8E8E",
+                        "index": 2
                       }
                     }
                   }
@@ -662,7 +667,22 @@
             ]
           }
         ]
-      }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "노드": 0,
+              "상태": 1,
+              "역할": 2,
+              "커널": 3,
+              "BPF LSM": 4,
+              "Pod": 5
+            }
+          }
+        }
+      ]
     },
     {
       "id": 6,
@@ -970,7 +990,23 @@
             ]
           }
         ]
-      }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "pod": 0,
+              "상태": 1,
+              "재시작": 2,
+              "노드": 3,
+              "Tetragon 정책": 4,
+              "Falco": 5,
+              "네트워크": 6
+            }
+          }
+        }
+      ]
     },
     {
       "id": 8,
@@ -1114,13 +1150,25 @@
             ]
           }
         ]
-      }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "컴포넌트": 0,
+              "종류": 1,
+              "Ready": 2
+            }
+          }
+        }
+      ]
     },
     {
       "id": 9,
       "type": "table",
       "title": "네트워크 · 정책에 막힌 흐름 (Hubble)",
-      "description": "Hubble Relay 에서 verdict=DROPPED 흐름을 모은 결과",
+      "description": "Hubble Relay 에서 verdict=DROPPED 흐름을 모은 결과. 아직 연결 전이라 비어 있습니다",
       "gridPos": {
         "x": 0,
         "y": 21,
@@ -1188,7 +1236,7 @@
               "type": "auto"
             }
           },
-          "noValue": "막힌 흐름 없음"
+          "noValue": "Hubble 연결 전 (다음 단계)"
         },
         "overrides": [
           {
@@ -1229,7 +1277,20 @@
             ]
           }
         ]
-      }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "출발 pod": 0,
+              "목적지": 1,
+              "횟수": 2,
+              "판정": 3
+            }
+          }
+        }
+      ]
     },
     {
       "id": 10,

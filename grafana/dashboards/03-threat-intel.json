@@ -1090,7 +1090,26 @@
             ]
           }
         ]
-      }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "IP": 0,
+              "국가": 1,
+              "ASN / ISP": 2,
+              "Abuse 점수": 3,
+              "신고 수": 4,
+              "VT 악성": 5,
+              "관련 사건": 6,
+              "최근 조회": 7,
+              "lat": 8,
+              "lon": 9
+            }
+          }
+        }
+      ]
     },
     {
       "id": 8,
@@ -1518,6 +1537,19 @@
         {
           "title": "관련 사건 보기 →",
           "url": "/d/tefal-overview?${__url_time_range}"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "파일": 0,
+              "SHA-256": 1,
+              "VT 악성": 2,
+              "판정": 3
+            }
+          }
         }
       ]
     }

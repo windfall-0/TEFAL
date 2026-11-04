@@ -72,6 +72,11 @@ class Builder:
         }
         if links:
             p["links"] = links
+        cols = (targets[0].get("columns") if targets else None) or []
+        if type_ == "table" and cols and not transformations:
+            # Infinity 표는 열 순서가 정의와 다르게(거꾸로) 나와서 열 순서를 고정한다
+            transformations = [{"id": "organize", "options": {
+                "indexByName": {c["text"]: i for i, c in enumerate(cols)}}}]
         if transformations:
             p["transformations"] = transformations
         self.panels.append(p)
@@ -550,8 +555,11 @@ def infra():
                   "false": {"text": "● NotReady", "color": RED, "index": 1}}}]),
               ov("BPF LSM", custom__cellOptions={"type": "color-text"}, mappings=[{"type": "value", "options": {
                   "true": {"text": "활성", "color": GREEN, "index": 0},
-                  "false": {"text": "비활성", "color": RED, "index": 1}}}]),
-          ])
+                  "false": {"text": "비활성", "color": RED, "index": 1},
+                  # 노드 라벨이 없고 LSM 이벤트도 관측되지 않은 노드 (예: 취약 앱이 없는 master)
+                  "unknown": {"text": "확인 안 됨", "color": GREY, "index": 2}}}]),
+          ],
+          desc="K8s API. BPF LSM: 노드 라벨 tefal.io/bpf-lsm, 없으면 최근 7일 Tetragon process_lsm 이벤트 관측 여부")
 
     b.add("bargauge", "노드 리소스", 12, 4, 12, 6,
           [prom('100 * (1 - avg by (nodename) (rate(node_cpu_seconds_total{mode="idle"}[5m]) '
@@ -601,10 +609,11 @@ def infra():
                [("src_pod", "출발 pod", "string"), ("dst", "목적지", "string"),
                 ("count", "횟수", "number"), ("verdict", "판정", "string")])],
           DS_B, table_opts(),
-          defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}}, "noValue": "막힌 흐름 없음"},
+          defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}},
+                    "noValue": "Hubble 연결 전 (다음 단계)"},
           overrides=[ov("판정", custom__width=100, color=fixed(ORANGE), custom__cellOptions={"type": "color-text"}),
                      ov("횟수", custom__width=70)],
-          desc="Hubble Relay 에서 verdict=DROPPED 흐름을 모은 결과")
+          desc="Hubble Relay 에서 verdict=DROPPED 흐름을 모은 결과. 아직 연결 전이라 비어 있습니다")
 
     b.add("text", "관리 도구", 12, 21, 12, 7, [], None,
           {"mode": "html", "content":

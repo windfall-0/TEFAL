@@ -20,7 +20,8 @@ from app.incidents.collector import Collector, LokiClient
 from app.incidents.levels import SigmaLevels
 from app.incidents.store import IncidentStore
 from app.incidents.tempo import TempoClient
-from app.routers import incidents, ingest, ops
+from app.k8s import K8sClient
+from app.routers import incidents, infra, ingest, ops
 
 
 @asynccontextmanager
@@ -32,6 +33,8 @@ async def lifespan(app: FastAPI):
     app.state.incidents_lock = asyncio.Lock()
     app.state.sigma_levels = SigmaLevels(settings.sigma_levels_file)
     app.state.pod_count_cache = {}
+    app.state.infra_cache = {}
+    app.state.k8s = K8sClient.in_cluster(settings.k8s_api_url) if settings.k8s_enabled else None
     app.state.tempo = (
         TempoClient(app.state.http, settings.tempo_url, settings.tempo_otlp_url)
         if settings.tempo_export_enabled
@@ -56,6 +59,8 @@ async def lifespan(app: FastAPI):
             with contextlib.suppress(asyncio.CancelledError):
                 await task
         await app.state.http.aclose()
+        if app.state.k8s is not None:
+            await app.state.k8s.close()
         await app.state.incidents.close()
         await app.state.cache.close()
 
@@ -83,4 +88,4 @@ AUTH = [Depends(require_token)]
 
 
 def _api_routers() -> list[APIRouter]:
-    return [incidents.router]
+    return [incidents.router, infra.router]

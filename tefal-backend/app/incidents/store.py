@@ -280,6 +280,13 @@ class IncidentStore:
             row = await cur.fetchone()
         return _row_to_incident(row) if row else None
 
+    async def runtimes_by_pod(self) -> dict[str, str]:
+        """사건에서 확인된 pod별 런타임 (④ 워크로드 표)."""
+        async with self._conn.execute(
+            "SELECT pod, runtime FROM incidents WHERE runtime IS NOT NULL GROUP BY pod"
+        ) as cur:
+            return {r[0]: r[1] for r in await cur.fetchall()}
+
     async def query(self, f: CommonFilters, limit: int | None = None) -> list[Incident]:
         where, args = ["start_ms BETWEEN ? AND ?"], [f.from_ms, f.to_ms]
         if f.namespace:

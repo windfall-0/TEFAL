@@ -1192,7 +1192,29 @@
             ]
           }
         ]
-      }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "시각": 0,
+              "단계": 1,
+              "상태": 2,
+              "namespace / pod": 3,
+              "런타임": 4,
+              "행위 요약": 5,
+              "MITRE": 6,
+              "출발지 IP": 7,
+              "트레이스": 8,
+              "AI 분석": 9,
+              "trace_id": 10,
+              "window_from_ms": 11,
+              "window_to_ms": 12
+            }
+          }
+        }
+      ]
     },
     {
       "id": 7,
@@ -1618,7 +1640,22 @@
             ]
           }
         ]
-      }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "정책": 0,
+              "구분": 1,
+              "계층": 2,
+              "액션": 3,
+              "히트": 4,
+              "오탐 의심": 5
+            }
+          }
+        }
+      ]
     }
   ]
 }

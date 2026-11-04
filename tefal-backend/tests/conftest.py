@@ -21,6 +21,7 @@ def settings(tmp_path) -> Settings:
         sigma_levels_file=str(tmp_path / "sigma_levels.yaml"),
         prometheus_url="http://prom.test:9090",
         falco_webhook_token="falco-token-5678",
+        k8s_enabled=False,
         _env_file=None,
     )
 

@@ -413,29 +413,40 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
 CPU/메모리 사용률과 노드·pod 수 Stat은 Prometheus가 직접 맡는다.
 표 패널(노드, 워크로드, 컴포넌트)은 여러 메트릭을 Grafana에서 조인하기 번거로워서 **백엔드가 K8s API로 한 번에 모아서 준다.**
 
+구현 (`app/k8s.py`, `app/infra.py`, `app/routers/infra.py`):
+- 새 의존성 없이 httpx로 K8s API를 부른다. pod의 ServiceAccount 토큰과 CA를 쓰고, 토큰은 60초마다 파일에서 다시 읽는다. 토큰이 없으면(로컬 실행) 인프라 API는 `503 k8s_unavailable`을 준다.
+- 응답은 30초 캐시한다. K8s API가 실패하면 직전 값으로 답하고, 직전 값이 없으면 `502 k8s_error`를 준다.
+
 #### `GET /infra/policies`
 "적용된 정책 9 · 격리된 워크로드 0" 카드.
 ```json
-{ "total": 9, "tracing_policies": 6, "falco_custom_rules": 3,
-  "isolated_workloads": 0 }
+{ "total": 17, "tracing_policies": 14, "tracing_block_policies": 3,
+  "falco_custom_rules": 3, "isolated_workloads": 0 }
 ```
 - `tracing_policies`: `cilium.io/v1alpha1` `TracingPolicy` + `TracingPolicyNamespaced` 개수
+- `tracing_block_policies`: 그중 `matchActions`에 `Override` 또는 `Sigkill`이 있는 정책 수
 - `falco_custom_rules`: Falco 커스텀 룰 ConfigMap의 `- rule:` 개수
 - `isolated_workloads`: 격리용 `CiliumNetworkPolicy`(라벨 `tefal.io/isolate=true`)가 걸린 pod 수
 
 #### `GET /infra/workloads`
 "워크로드 보호 현황" 표.
-- 파라미터: `namespace`(기본 `web`)
+- 파라미터: `namespace`(기본 `WATCH_NAMESPACES`의 첫 값)
 ```json
-[{ "pod": "dvwa-7c9f", "pod_label": "dvwa-7c9f (PHP)", "runtime": "PHP",
-   "status": "Running", "restarts": 0, "node": "k8s-node2",
-   "tetragon_policy": "php 차단 + uprobe",
-   "falco": "기본 + 커스텀",
-   "network": "이그레스 제한" }]
+[{ "pod": "php2shell-b994795c-kj4rm", "pod_label": "php2shell-b994795c-kj4rm (PHP)", "runtime": "PHP",
+   "status": "Running", "restarts": 0, "node": "k8s-worker2",
+   "tetragon_policy": "차단 1 · 관찰 3",
+   "tetragon_policies": ["php2shell-kprobe-execve", "..."],
+   "falco": "기본 + 커스텀 3",
+   "network": "" }]
 ```
 - `pod_label`: 비교용 pod는 `(비교용)`, traffic-gen은 `(정상 트래픽)`을 붙인다(라벨 `tefal.io/role`).
 - `status`: pod phase. CrashLoopBackOff 같은 컨테이너 대기 사유가 있으면 그 값을 준다.
-- 매핑 기준: TracingPolicy의 `podSelector`와 CiliumNetworkPolicy의 `endpointSelector`를 pod 라벨에 맞춰 본다. 정책이 없으면 빈 문자열을 준다.
+- 매핑 기준: TracingPolicy의 `podSelector`와 CiliumNetworkPolicy의 `endpointSelector`를 pod 라벨에 맞춰 본다(`matchLabels`, `matchExpressions`, `k8s:` 접두사). 정책이 없으면 빈 문자열을 준다.
+  - `TracingPolicyNamespaced`는 같은 namespace pod에만 건다.
+  - `podSelector`가 없는 TracingPolicy는 Tetragon이 모든 pod에 걸지만 실제로는 uprobe 대상 바이너리로 좁혀진다. 표에서는 정책 이름 앞부분(`php2shell-...`)이 pod의 `app` 라벨과 같을 때만 그 pod의 정책으로 센다.
+- `tetragon_policy`: 차단(Override·Sigkill) 정책 수와 관찰 정책 수.
+- `runtime`: 사건에서 확인된 런타임 → 이미지 이름 → 라벨 순으로 정한다. DB·캐시 이미지(mariadb, mysql, postgres, redis, mongo, memcached)는 런타임을 비운다.
+- `falco`: 기본 룰은 모든 컨테이너에 걸린다. 커스텀 룰 ConfigMap(`FALCO_RULES_CONFIGMAP`)에 그 namespace가 나오면 `기본 + 커스텀 N`.
 
 #### `GET /infra/nodes`
 "노드" 표.
@@ -445,14 +456,15 @@ CPU/메모리 사용률과 노드·pod 수 Stat은 Prometheus가 직접 맡는�
 ```
 - `ready`, `bpf_lsm`은 문자열 `"true"`/`"false"`로 준다(값 매핑용).
 - `kernel`은 `node.status.nodeInfo.kernelVersion`에서 읽는다.
-- `bpf_lsm`은 Tetragon 로그 또는 노드 라벨 `tefal.io/bpf-lsm`에서 읽는다(아래 미결정 사항 참고).
+- `bpf_lsm`: 노드 라벨 `tefal.io/bpf-lsm`(true/false)이 있으면 그 값. 없으면 최근 7일 Tetragon `process_lsm` 이벤트가 나온 노드를 `"true"`로, 나머지는 `"unknown"`(확인 안 됨)으로 준다. LSM 정책이 걸리지 않는 노드(control-plane)는 `unknown`이 정상이다. Loki 조회는 5분 캐시한다.
+- `role`: control-plane 라벨이 있고 `NoSchedule` taint가 있으면 `control-plane`, taint가 없으면 `control-plane + worker`.
 
 #### `GET /infra/components`
 "보안·관측 컴포넌트" 표.
 ```json
 [{ "name": "Cilium", "kind": "DS", "ready": 2, "desired": 2, "ready_text": "2/2" }]
 ```
-대상: Cilium(DS), Hubble Relay(Deploy), Tetragon(DS), Falco(DS), Alloy(DS), Loki(STS), Tempo(STS), Grafana(Deploy), tefal-backend(Deploy). 이름과 namespace는 설정 파일로 관리한다.
+대상: Cilium(DS), Hubble Relay(Deploy), Tetragon(DS), Falco(DS), Falcosidekick(Deploy), Alloy(DS), Loki(STS), Tempo(STS), Prometheus(STS), Grafana(Deploy), tefal-backend(Deploy). 목록은 `app/infra.py`의 `DEFAULT_COMPONENTS`에 있다. 객체가 없거나 읽을 수 없으면 `ready_text`가 `"없음"`이다.
 
 #### `GET /network/drops`
 "네트워크 · 정책에 막힌 흐름 (Hubble)".
@@ -526,6 +538,9 @@ Hubble Relay `GetFlows`에서 `verdict=DROPPED`, `namespace`를 필터한다. �
 | `FALCO_WAIT_SEC` | `30` | Falco 경보 뒤 차단을 기다리는 시간 |
 | `CORRELATE_MAX_DEPTH` | `8` | ancestors 없이 parent를 따라 올라갈 최대 단계 |
 | `HUBBLE_RELAY_ADDR` | `hubble-relay.kube-system.svc:80` | |
+| `K8S_ENABLED` | `true` | ④ 인프라 API. ServiceAccount 토큰이 없으면 자동으로 꺼진다 |
+| `K8S_API_URL` | `https://kubernetes.default.svc` | |
+| `FALCO_RULES_CONFIGMAP` | `falco/falco-rules` | Falco 커스텀 룰 ConfigMap (`namespace/name`) |
 | `ABUSEIPDB_API_KEY` | (필수) | |
 | `ABUSEIPDB_DAILY_LIMIT` | `1000` | |
 | `VIRUSTOTAL_API_KEY` | (필수) | |
@@ -549,7 +564,10 @@ API 키는 K8s `Secret`으로 주입한다. 이미지와 ConfigMap에 넣지 않
 
 ## 8. 보안 요구사항
 
-- **RBAC:** `pods`, `nodes`, `configmaps`, `tracingpolicies`, `tracingpoliciesnamespaced`, `ciliumnetworkpolicies`에 `get/list/watch`만 준다. `create/update/delete/exec`는 주지 않는다.
+- **RBAC:** ServiceAccount `monitoring/tefal-backend`.
+  - ClusterRole `tefal-backend-read`: `pods`, `nodes`, `daemonsets`·`deployments`·`statefulsets`, `tracingpolicies`, `tracingpoliciesnamespaced`, `ciliumnetworkpolicies`, `ciliumclusterwidenetworkpolicies`에 `get/list`만 준다.
+  - Role `falco/tefal-backend-falco-rules`: ConfigMap `falco-rules` 하나에 `get`만 준다(`resourceNames`).
+  - Secret, ConfigMap 목록, `create/update/delete/exec`는 주지 않는다. 실제 클러스터에서 `kubectl auth can-i`로 확인했다.
 - **네트워크:** `CiliumNetworkPolicy`로 ingress는 Grafana, Prometheus(지표 수집), Falcosidekick core(`falco` namespace)만 허용한다. egress는 Tempo(3200, 4318), Loki(3100), Prometheus(9090), K8s API, DNS(nodelocaldns), `pypi.org`·`files.pythonhosted.org`(빌드 없는 배포의 의존성 설치)만 허용한다. Hubble Relay, `api.abuseipdb.com`, `www.virustotal.com`, `generativelanguage.googleapis.com`은 해당 기능 단계에서 추가한다. 현재 정책은 `deploy/backend/gen_backend.py`가 만든다.
 - **로그 속 비밀값:** Tetragon 이벤트의 `arguments`에는 명령 인자가 그대로 들어 있어서 비밀번호가 섞일 수 있다(실제 클러스터에서 `curl -u admin:<비밀번호>`가 확인됨). AI 프롬프트, 사건 요약, Tempo span 속성에 넣기 전에 `-u user:pass`, `--password=`, `Authorization:`, `token=` 같은 패턴을 `<가림>`으로 바꾼다.
 - **입력 검증:** `trace_id`는 hex 32자, `ip`는 `ipaddress` 모듈로 검증한다. TraceQL/LogQL에 사용자 입력을 문자열로 이어 붙이지 않는다.

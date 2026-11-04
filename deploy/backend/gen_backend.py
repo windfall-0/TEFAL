@@ -47,7 +47,9 @@ deploy = {
         "template": {
             "metadata": {"labels": LABELS},
             "spec": {
-                "automountServiceAccountToken": False,
+                # ④ 인프라: K8s API 읽기 전용 (아래 RBAC). 토큰은 이 SA 것만 마운트된다
+                "serviceAccountName": "tefal-backend",
+                "automountServiceAccountToken": True,
                 "affinity": {"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": {
                     "nodeSelectorTerms": [{"matchExpressions": [
                         {"key": "kubernetes.io/hostname", "operator": "In", "values": ["k8s-worker2"]}]}]}}},
@@ -105,6 +107,39 @@ deploy = {
             },
         },
     },
+}
+
+# ---- RBAC (BACKEND_API.md 8장): get/list만. create/update/delete/exec 없음
+sa = {"apiVersion": "v1", "kind": "ServiceAccount",
+      "metadata": {"name": "tefal-backend", "namespace": NS, "labels": LABELS}}
+cluster_role = {
+    "apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRole",
+    "metadata": {"name": "tefal-backend-read", "labels": LABELS},
+    "rules": [
+        {"apiGroups": [""], "resources": ["pods", "nodes"], "verbs": ["get", "list"]},
+        {"apiGroups": ["apps"], "resources": ["daemonsets", "deployments", "statefulsets"], "verbs": ["get", "list"]},
+        {"apiGroups": ["cilium.io"], "verbs": ["get", "list"],
+         "resources": ["tracingpolicies", "tracingpoliciesnamespaced",
+                       "ciliumnetworkpolicies", "ciliumclusterwidenetworkpolicies"]},
+    ],
+}
+cluster_binding = {
+    "apiVersion": "rbac.authorization.k8s.io/v1", "kind": "ClusterRoleBinding",
+    "metadata": {"name": "tefal-backend-read", "labels": LABELS},
+    "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": "tefal-backend-read"},
+    "subjects": [{"kind": "ServiceAccount", "name": "tefal-backend", "namespace": NS}],
+}
+# Falco 커스텀 룰 ConfigMap 하나만 (configmaps 전체 읽기 권한은 주지 않는다)
+falco_role = {
+    "apiVersion": "rbac.authorization.k8s.io/v1", "kind": "Role",
+    "metadata": {"name": "tefal-backend-falco-rules", "namespace": "falco", "labels": LABELS},
+    "rules": [{"apiGroups": [""], "resources": ["configmaps"], "resourceNames": ["falco-rules"], "verbs": ["get"]}],
+}
+falco_binding = {
+    "apiVersion": "rbac.authorization.k8s.io/v1", "kind": "RoleBinding",
+    "metadata": {"name": "tefal-backend-falco-rules", "namespace": "falco", "labels": LABELS},
+    "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": "tefal-backend-falco-rules"},
+    "subjects": [{"kind": "ServiceAccount", "name": "tefal-backend", "namespace": NS}],
 }
 
 pvc = {"apiVersion": "v1", "kind": "PersistentVolumeClaim",
@@ -165,5 +200,6 @@ os.makedirs(OUT, exist_ok=True)
 json.dump(code_cm, open(os.path.join(OUT, "10-code-configmap.json"), "w", encoding="utf-8"), ensure_ascii=False)
 json.dump(sigma_cm, open(os.path.join(OUT, "15-sigma-configmap.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 with open(os.path.join(OUT, "20-backend.json"), "w", encoding="utf-8") as f:
-    json.dump({"apiVersion": "v1", "kind": "List", "items": [pvc, deploy, svc, sm, cnp]}, f, ensure_ascii=False, indent=1)
+    json.dump({"apiVersion": "v1", "kind": "List", "items": [sa, cluster_role, cluster_binding, falco_role, falco_binding,
+                                                  pvc, deploy, svc, sm, cnp]}, f, ensure_ascii=False, indent=1)
 print("files:", len(items), "cm bytes:", sum(len(v.encode()) for v in data.values()))

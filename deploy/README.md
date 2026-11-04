@@ -54,7 +54,7 @@ kubectl create configmap tefal-dashboards -n monitoring --from-file=dashboards/ 
 python deploy/backend/gen_backend.py tefal-backend deploy/backend/out
 #   10-code-configmap.json  코드 (app/**/*.py, pyproject.toml, uv.lock, allowlist.yaml)
 #   15-sigma-configmap.json 경고 단계 매칭 표 (tefal-backend/config/sigma_levels.yaml)
-#   20-backend.json         PVC, Deployment, Service, ServiceMonitor, CiliumNetworkPolicy
+#   20-backend.json         ServiceAccount·RBAC, PVC, Deployment, Service, ServiceMonitor, CiliumNetworkPolicy
 ```
 
 ```bash
@@ -71,6 +71,10 @@ kubectl rollout restart deploy/tefal-backend -n monitoring   # 코드만 바뀐 
 
 - 컨테이너 이름은 `tefal-backend`다. 사건 요약 줄이 Loki에 `{namespace="monitoring", container="tefal-backend"}`로 들어간다.
 - 첫 기동 시 `COLLECT_BACKFILL_HOURS=168`(7일) 만큼 Tetragon 로그를 읽어 사건을 만든다.
+- `20-backend.json`에는 ④ 인프라용 읽기 전용 권한이 들어 있다. 권한 부여이므로 적용 전에 범위를 확인한다.
+  - ClusterRole `tefal-backend-read`: pods·nodes·DS/Deploy/STS·TracingPolicy(Namespaced)·CNP·CCNP `get/list`
+  - Role `falco/tefal-backend-falco-rules`: ConfigMap `falco-rules` `get`
+  - 확인: `kubectl auth can-i list pods --as=system:serviceaccount:monitoring:tefal-backend` → yes, `get secrets`·`list configmaps`·`create pods`·`create pods/exec` → no
 
 ### 경고 단계 표 수정
 
