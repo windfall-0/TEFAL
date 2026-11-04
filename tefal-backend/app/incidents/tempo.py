@@ -15,6 +15,7 @@ from dataclasses import dataclass
 import httpx
 from prometheus_client import Counter
 
+from app.incidents.dedup import collapse, tetragon_key
 from app.incidents.tetragon import TetragonEvent
 
 log = logging.getLogger(__name__)
@@ -184,8 +185,12 @@ def root_span(inc, start_ns: int, end_ns: int, beyla: BeylaLink | None) -> dict:
     )
 
 
-def tetragon_spans(trace_id: str, root: str, events: Iterable[TetragonEvent], redact) -> list[dict]:
-    """프로세스마다 proc span(exec~exit), 그 아래 uprobe/kprobe/LSM 이벤트 span."""
+def tetragon_spans(trace_id: str, root: str, events: Iterable[TetragonEvent], redact,
+                   gap_ns: int = 1_000_000_000) -> list[dict]:
+    """프로세스마다 proc span(exec~exit), 그 아래 uprobe/kprobe/LSM 이벤트 span.
+
+    같은 프로세스의 같은 행위가 gap_ns 안에 반복되면 span 하나로 접고 `tefal.repeat_count`를 붙인다(dedup.py).
+    """
     events = sorted(events, key=lambda e: e.time_ns)
     procs: dict[str, dict] = {}
     for e in events:
@@ -203,17 +208,20 @@ def tetragon_spans(trace_id: str, root: str, events: Iterable[TetragonEvent], re
              "process.binary": e.process.binary, "process.args": redact(e.process.arguments)[:500],
              "tetragon.exec_id": eid, "tetragon.parent_exec_id": parent_eid, "k8s.pod": e.pod},
         ))
-    for e in events:
-        if e.event_type in ("process_exec", "process_exit"):
-            continue  # proc span 시작·끝으로 표현
+    # proc span 시작·끝으로 표현하는 exec/exit는 빼고, 반복은 접는다
+    runs = collapse((e for e in events if e.event_type not in ("process_exec", "process_exit")),
+                    tetragon_key, lambda e: e.time_ns, gap_ns)
+    for run in runs:
+        e = run.first
         layer = LAYER.get(e.event_type, "proc")
         what = e.function or e.policy or e.event_type.removeprefix("process_")
         out.append(_span(
             trace_id, span_id(trace_id, "ev", e.process.exec_id, e.time_ns, e.event_type),
             span_id(trace_id, "proc", e.process.exec_id),
-            f"{layer} {what}", e.time_ns, e.time_ns,
+            f"{layer} {what}" + (f" ×{run.count}" if run.count > 1 else ""), run.first_ns, run.last_ns,
             {"tefal.layer": layer, "tefal.policy": e.policy,
              "tefal.action": (e.action or "").removeprefix("KPROBE_ACTION_").title() or None,
+             "tefal.repeat_count": run.count,
              "tetragon.event": e.event_type, "tetragon.target": e.file_arg,
              "tetragon.exec_id": e.process.exec_id, "process.pid": e.process.pid},
             error=e.is_anchor,

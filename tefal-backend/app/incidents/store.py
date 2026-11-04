@@ -65,6 +65,16 @@ CREATE TABLE IF NOT EXISTS state (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS detections (  -- 탐지 1건 = 1초 안 반복을 접은 묶음 (dedup.py). ① 탐지 수
+    source    TEXT NOT NULL,              -- tetragon | falco
+    name      TEXT NOT NULL,              -- 정책 이름 | 룰 이름
+    namespace TEXT,
+    priority  TEXT,                       -- Falco priority
+    first_ns  INTEGER NOT NULL,
+    last_ns   INTEGER NOT NULL,
+    count     INTEGER NOT NULL            -- 접힌 원본 줄 수
+);
+CREATE INDEX IF NOT EXISTS detections_first ON detections(first_ns);
 """
 
 COLUMNS = ["trace_id", "start_ms", "anchor_ms", "last_ms", "status", "level", "level_source", "action", "detected_by", "namespace", "pod", "node", "runtime", "runtime_detail", "summary", "mitre", "src_ip", "exec_id", "parent_exec_id", "policy", "container_id", "falco_rules", "falco_ms", "beyla_trace_id", "beyla_link_confidence", "beyla_span_id", "updated_ms"]
@@ -279,6 +289,40 @@ class IncidentStore:
         ) as cur:
             row = await cur.fetchone()
         return _row_to_incident(row) if row else None
+
+    # ---- 탐지 (① 탐지 수) ----
+    async def add_detection(self, source: str, name: str, namespace: str | None, priority: str | None,
+                            first_ns: int, last_ns: int, count: int) -> int:
+        cur = await self._conn.execute(
+            "INSERT INTO detections(source, name, namespace, priority, first_ns, last_ns, count) VALUES (?,?,?,?,?,?,?)",
+            (source, name, namespace, priority, first_ns, last_ns, count),
+        )
+        return cur.lastrowid
+
+    async def extend_detection(self, rowid: int, count: int, last_ns: int) -> None:
+        await self._conn.execute(
+            "UPDATE detections SET count = count + ?, last_ns = MAX(last_ns, ?) WHERE rowid = ?", (count, last_ns, rowid)
+        )
+
+    async def detection_counts(self, from_ns: int, to_ns: int, namespace: str | None) -> dict:
+        """시간 범위 안에서 시작한 탐지 수: {"tetragon": {정책: n}, "falco": {룰: n}, "falco_priority": {룰: p}}."""
+        where, args = ["first_ns BETWEEN ? AND ?"], [from_ns, to_ns]
+        if namespace:
+            where.append("namespace = ?")
+            args.append(namespace)
+        out: dict = {"tetragon": {}, "falco": {}, "falco_priority": {}}
+        async with self._conn.execute(
+            f"SELECT source, name, COUNT(*), MAX(priority) FROM detections WHERE {' AND '.join(where)} GROUP BY source, name",
+            args,
+        ) as cur:
+            for source, name, n, prio in await cur.fetchall():
+                out[source][name] = n
+                if source == "falco" and prio:
+                    out["falco_priority"][name] = prio
+        return out
+
+    async def prune_detections(self, before_ns: int) -> None:
+        await self._conn.execute("DELETE FROM detections WHERE first_ns < ?", (before_ns,))
 
     async def runtimes_by_pod(self) -> dict[str, str]:
         """사건에서 확인된 pod별 런타임 (④ 워크로드 표)."""

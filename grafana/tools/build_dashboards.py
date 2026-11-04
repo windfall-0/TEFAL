@@ -249,8 +249,9 @@ def overview():
           overrides=[ov(t, color=fixed(c)) for _, t, c in LEVELS],
           # Infinity가 열을 알파벳순으로 바꾸므로 높은 단계부터 순서를 고정한다
           transformations=[{"id": "organize", "options": {"indexByName": {t: i for i, (_, t, _) in enumerate(LEVELS)}}}],
-          desc="Tetragon·Falco 로그 한 줄을 1로 세서 정책·룰의 Sigma level별로 더한 값입니다. "
-               "공격 1번에 로그가 여러 줄 나오므로 사건 수와 단위가 다릅니다(사건별 단계는 사건 큐의 '단계' 열). "
+          desc="Tetragon·Falco 탐지를 정책·룰의 Sigma level별로 더한 값입니다. "
+               "같은 프로세스의 같은 행위가 1초 안에 반복되면 1건으로 셉니다. "
+               "공격 1번에 탐지가 여러 건 나오므로 사건 수와 단위가 다릅니다(사건별 단계는 사건 큐의 '단계' 열). "
                "namespace·시간 범위만 적용되고 런타임·상태·단계 필터는 적용되지 않습니다. "
                "Tetragon은 지금 클러스터에 적용된 정책의 로그만 셉니다. "
                "매칭 표는 tefal-backend의 sigma_levels.yaml, 표에 없는 정책·룰은 Info.")
@@ -326,7 +327,7 @@ def overview():
               ov("구분", custom__width=110), ov("계층", custom__width=170), ov("액션", custom__width=130),
               ov("히트", custom__width=70, custom__align="right"),
           ],
-          desc="정책별 시간 범위 안 히트 수 (Tetragon·Falco 로그 기준). 구분 = 경고 단계")
+          desc="정책별 시간 범위 안 히트 수 (Tetragon·Falco 로그 기준, 같은 프로세스의 같은 행위가 1초 안에 반복되면 1건). 구분 = 경고 단계")
 
     variables = [
         {"type": "query", "name": "namespace", "label": "namespace", "hide": 0, "datasource": DS_P,
@@ -383,9 +384,9 @@ def incident():
            {"refId": "B", "datasource": DS_L, "expr": '${loki_selector} |= `"exec_id":"${parent_exec_id}"`', "queryType": "range"}],
           DS_L,
           {"showTime": True, "showLabels": False, "showCommonLabels": False, "wrapLogMessage": True,
-           "prettifyLogMessage": False, "enableLogDetails": True, "dedupStrategy": "exact",
+           "prettifyLogMessage": False, "enableLogDetails": True, "dedupStrategy": "numbers",
            "sortOrder": "Ascending"},
-          desc="출처: Loki · exec_id 와 parent exec_id 로 필터")
+          desc="출처: Loki · exec_id 와 parent exec_id 로 필터. 숫자(시각 등)만 다른 연속 줄은 한 줄로 접어 반복 횟수를 표시합니다 (중복 제거: Numbers)")
 
     b.add("stat", "출발지 IP 요약", 16, 19, 8, 9,
           [inf("/ti/ip/${src_ip}",

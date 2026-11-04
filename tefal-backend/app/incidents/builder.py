@@ -145,7 +145,8 @@ async def save_cluster(
         start_ns = min([inc.start_ms * MS, *(e.time_ns for e in mem)])
         end_ns = max([inc.last_ms * MS, *(e.time_ns for e in mem)])
         root = root_span(inc, start_ns, end_ns, link)
-        spans = [root, *tetragon_spans(inc.trace_id, root["spanId"], mem, correlate.redact)]
+        spans = [root, *tetragon_spans(inc.trace_id, root["spanId"], mem, correlate.redact,
+                                            int(settings.dedup_gap_sec * 1e9))]
         await export_new(tempo, store, inc.trace_id, spans)
     return inc.trace_id, created
 

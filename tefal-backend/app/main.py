@@ -18,6 +18,7 @@ from app.core.logging import setup_logging
 from app.core.metrics import install_metrics_middleware
 from app.hubble.client import HubbleClient
 from app.incidents.collector import Collector, LokiClient
+from app.incidents.detections import DetectionCollector
 from app.incidents.levels import SigmaLevels
 from app.incidents.store import IncidentStore
 from app.incidents.tempo import TempoClient
@@ -46,13 +47,15 @@ async def lifespan(app: FastAPI):
     )
     task = None
     if settings.collector_enabled:
+        loki = LokiClient(app.state.http, settings.loki_url)
         collector = Collector(
             settings,
             app.state.incidents,
-            LokiClient(app.state.http, settings.loki_url),
+            loki,
             app.state.sigma_levels,
             app.state.incidents_lock,
             app.state.tempo,
+            DetectionCollector(settings, app.state.incidents, loki),
         )
         task = asyncio.create_task(collector.run(), name="tetragon-collector")
     try:

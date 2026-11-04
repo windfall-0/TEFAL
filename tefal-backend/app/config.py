@@ -42,6 +42,7 @@ class Settings(BaseSettings):
     # Falco (Falcosidekick webhook)
     falco_webhook_token: SecretStr | None = None  # 없으면 /ingest/falco는 503
     falco_min_priority: str = "Warning"
+    dedup_gap_sec: float = 1.0  # 같은 행위 반복을 1건으로 접는 간격 (dedup.py)
     falco_wait_sec: int = 30
 
     # 외부 TI / AI (해당 기능 단계에서 필수 검사)

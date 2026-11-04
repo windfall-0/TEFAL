@@ -58,8 +58,10 @@ class Collector:
         levels: SigmaLevels,
         lock: asyncio.Lock | None = None,
         tempo: TempoClient | None = None,
+        detections=None,
     ) -> None:
         self.tempo = tempo
+        self.detections = detections  # DetectionCollector (① 탐지 수), 같은 루프에서 돈다
         self.s = settings
         self.lock = lock or asyncio.Lock()  # Falco 수신과 DB 쓰기를 겹치지 않게 한다
         self.store = store
@@ -73,6 +75,8 @@ class Collector:
             try:
                 async with self.lock:
                     busy = await self.step()
+                    if self.detections is not None:
+                        busy = await self.detections.step() or busy
             except asyncio.CancelledError:
                 raise
             except Exception:

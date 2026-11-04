@@ -137,7 +137,7 @@ Falco ─→ Falcosidekick ─(webhook)────────┼→ tefal-back
 
 | 대상 | 내용 |
 |---|---|
-| Tempo | 계층별 span: 루트 `incident <pod>` 아래 프로세스마다 `proc <binary>`(exec~exit), 그 아래 `app·uprobe` / `proc`(kprobe) / `kernel·LSM` 이벤트 span, `falco` span. 기준점 span은 `status=ERROR`. Beyla HTTP span은 루트 span의 span link로 연결. OTLP/HTTP JSON으로 보낸다(`TEMPO_OTLP_URL`). **한 번 보낸 span은 다시 보내지 않는다**(`exported_spans` 표). Tempo는 같은 span ID를 합쳐 주지 않아서, 다시 보내면 중복 span이 생겨 Grafana Trace View가 그려지지 않는다 |
+| Tempo | 계층별 span: 루트 `incident <pod>` 아래 프로세스마다 `proc <binary>`(exec~exit), 그 아래 `app·uprobe` / `proc`(kprobe) / `kernel·LSM` 이벤트 span, `falco` span. 같은 프로세스의 같은 행위가 1초(`DEDUP_GAP_SEC`) 안에 반복되면 span 하나로 접고 이름에 `×N`, 속성 `tefal.repeat_count`를 붙인다(span 길이 = 처음~마지막 반복). 기준점 span은 `status=ERROR`. Beyla HTTP span은 루트 span의 span link로 연결. OTLP/HTTP JSON으로 보낸다(`TEMPO_OTLP_URL`). **한 번 보낸 span은 다시 보내지 않는다**(`exported_spans` 표). Tempo는 같은 span ID를 합쳐 주지 않아서, 다시 보내면 중복 span이 생겨 Grafana Trace View가 그려지지 않는다 |
 | SQLite | 아래 사건 모델 + `members` 테이블(`trace_id`, `exec_id`, `event_time_ns`, `event_type`) |
 | Loki | 사건 요약 1줄. 백엔드 stdout(logger `tefal.incident`)에 남기고 Alloy가 수집한다. 조회 `{namespace="monitoring", container="tefal-backend"} \|= "tefal_incident"`, 내용 `tefal_incident trace_id=<id> status=<status> level=<level> pod=<pod> policy=<policy>`. 사건을 만들거나 상태가 바뀔 때마다 1줄씩 남는다. 기존 Grafana Loki 데이터소스의 derived field(`trace_id[=:"\s]+([a-f0-9]{32})`)가 이 값을 Tempo 링크로 바꿔 준다 |
 
@@ -284,7 +284,11 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
 
 구현 (`app/policies.py`, `app/routers/policies.py`):
 - 행: 클러스터의 TracingPolicy 전체(`namespace`를 주면 다른 namespace의 `TracingPolicyNamespaced` 제외) + Falco 커스텀 룰 전체 + 그 namespace에서 맞은 Falco 기본 룰. `Falco internal: ...` 자체 상태 경보는 뺀다. 지금 클러스터에 없는 옛 정책 이름은 히트가 있어도 보이지 않는다.
-- `hits`: Tetragon은 Loki `count_over_time`을 `policy_name`(kprobe·uprobe·lsm·tracepoint)별로, Falco는 `{namespace="falco", container="falco"}` 로그를 `rule`별로 센다. namespace는 각각 `process.pod.namespace`, `output_fields["k8s.ns.name"]`로 거른다. 30초 캐시.
+- `hits`: **탐지 건수**다. 로그 줄 수가 아니다. 같은 행위가 1초(`DEDUP_GAP_SEC`) 안에 반복되면 1건으로 센다.
+  - 같은 행위: Tetragon은 같은 pod·프로세스(`exec_id`)·정책·함수·이벤트 종류·대상 파일·인자. Falco는 pod·룰·명령줄·`fd.name`.
+  - 근거(2026-11-04 vuln-lab 하루치): Tetragon 698줄 중 85%가 막힌 실행을 1ms 안에 수십~수백 번 다시 시도한 묶음이었다. 접는 간격 1초 → 128건, 10초 → 118건으로 거의 같고, 30초부터는 따로 실행한 공격이 합쳐졌다(96건). 그래서 1초로 좁게 잡았다.
+  - 구현: 수집기가 Tetragon(`|= "policy_name"`)·Falco(`{namespace="falco", container="falco"}`) 로그를 1시간 구간씩 읽어 접은 탐지를 DB `detections` 표에 쌓는다(커서 `detections_cursor_ns`, 첫 기동 시 `COLLECT_BACKFILL_HOURS`만큼, 30일 보관). API는 이 표를 센다. 요청마다 Loki 원본 줄을 다시 읽으면 7일 범위에서 Loki가 시간 초과로 실패해서다.
+  - namespace는 이벤트의 pod namespace(Falco는 `k8s.ns.name`)로 거른다. 30초 캐시.
 - `layer`: TracingPolicy spec에 있는 훅 종류(`lsmhooks`, `kprobes`, `tracepoints`, `uprobes`). 여러 개면 `+`로 잇는다.
 - `tag`: Falco 룰은 표에 없으면 룰 정의의 `priority`로 정한다(히트가 없어도 단계가 나온다).
 - **오탐 의심은 아직 판정하지 않는다** (`false_positive_suspect`, `fp_note`가 `null`). 대시보드 표에서도 칸을 뺐다. 아래 규칙은 다음 단계 안이다.
@@ -295,7 +299,7 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
 { "total": 412, "level_critical_count": 153, "level_high_count": 92, "level_medium_count": 96,
   "level_low_count": 31, "level_informational_count": 40 }
 ```
-- Tetragon·Falco 로그 한 줄을 1로 세서 정책·룰의 단계(4.8)별로 더한다. `/policies/stats`와 같은 Loki 집계(30초 캐시)를 쓴다.
+- 탐지 건수(위 `hits`와 같은 기준, 1초 안 반복은 1건)를 정책·룰의 단계(4.8)별로 더한다. `/policies/stats`와 같은 집계(30초 캐시)를 쓴다.
 - Tetragon은 **지금 클러스터에 있는 TracingPolicy의 로그만** 센다. 옛 테스트 정책(`r2s-final-*` 등)의 로그는 Loki에 남아 있어도 빼서, 지운 정책이 Info를 부풀리지 않게 한다. Falco는 모든 룰을 세고 `Falco internal: ...`만 뺀다.
 - 사건 수와 단위가 다르다(공격 1번 = 로그 여러 줄). `runtime`, `status`, `level` 필터는 적용하지 않는다.
 
@@ -557,6 +561,7 @@ Hubble Relay `GetFlows`에서 `verdict=DROPPED`이고 출발지나 목적지 pod
 | `COLLECT_INTERVAL_SEC` | `5` | 수집 주기. 병합 대기(`CORRELATE_MERGE_SEC`+5초)보다 오래된 구간만 처리한다 |
 | `COLLECT_BACKFILL_HOURS` | `24` (배포 `168`) | 커서가 없을 때(첫 기동·DB 재생성) 거슬러 읽을 범위 |
 | `COLLECT_CHUNK_SEC` | `3600` | 한 번에 읽는 Loki 구간 |
+| `DEDUP_GAP_SEC` | `1` | 같은 행위 반복을 탐지 1건(① 히트·단계별 탐지)과 span 1개(② Trace View)로 접는 간격 |
 | `LOKI_TETRAGON_SELECTOR` | `{namespace="kube-system", container="export-stdout"}` | |
 | `FALCO_WEBHOOK_TOKEN` | (선택) | Falcosidekick → 백엔드 인증. 없으면 `/ingest/falco`가 `503` |
 | `FALCO_MIN_PRIORITY` | `Warning` | 이보다 낮은 경보는 기준점으로 쓰지 않음 |

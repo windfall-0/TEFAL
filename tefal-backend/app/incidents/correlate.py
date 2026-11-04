@@ -11,8 +11,9 @@ NS = 1_000_000_000
 
 
 # trace_id 규칙 버전. Tempo에 잘못 기록된 trace는 지울 수 없어서, 다시 만들 때 버전을 올려 새 ID를 쓴다.
-#   1: 최초, 2: 중복 span 기록 수정, 3: Beyla 조회 범위 수정, 4: Sigma 매칭 표 적용 후 재생성 (2026-11-04)
-TRACE_ID_VERSION = "4"
+#   1: 최초, 2: 중복 span 기록 수정, 3: Beyla 조회 범위 수정, 4: Sigma 매칭 표 적용 후 재생성,
+#   5: 1초 안 반복 이벤트를 span 하나로 접음 (2026-11-04)
+TRACE_ID_VERSION = "5"
 
 
 def make_trace_id(node: str, anchor_id: str, anchor_time_ns: int) -> str:
