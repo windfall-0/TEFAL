@@ -1,0 +1,69 @@
+# TEFAL 추가 values (helm upgrade --reuse-values -f 로 사용)
+# datasources 목록은 통째로 교체되므로 기존 Loki/Tempo 정의를 그대로 포함한다.
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+    - access: proxy
+      isDefault: true
+      jsonData:
+        derivedFields:
+        - datasourceUid: tempo-ds
+          matcherRegex: trace_id[=:"\s]+([a-f0-9]{32})
+          name: TraceID
+          url: $${__value.raw}
+      name: Loki
+      type: loki
+      uid: P8E80F9AEF21F6940
+      url: http://loki-gateway.monitoring.svc.cluster.local
+    - access: proxy
+      jsonData:
+        nodeGraph:
+          enabled: true
+        tracesToLogsV2:
+          datasourceUid: P8E80F9AEF21F6940
+          filterBySpanID: false
+          filterByTraceID: true
+          spanEndTimeShift: 5m
+          spanStartTimeShift: -5m
+      name: Tempo
+      type: tempo
+      uid: tempo-ds
+      url: http://tempo.monitoring.svc.cluster.local:3200
+    - name: Prometheus
+      uid: prometheus
+      type: prometheus
+      access: proxy
+      url: http://kube-prometheus-stack-prometheus.monitoring:9090
+      jsonData:
+        timeInterval: 30s
+    - name: tefal-backend
+      uid: tefal-backend
+      type: yesoreyeram-infinity-datasource
+      access: proxy
+      url: http://tefal-backend.monitoring.svc:8000
+      jsonData:
+        auth_method: bearerToken
+        allowedHosts:
+        - http://tefal-backend.monitoring.svc:8000
+        timeoutInSeconds: 40
+      secureJsonData:
+        bearerToken: $TEFAL_API_TOKEN
+
+envFromSecret: tefal-backend-token
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+    - name: tefal
+      orgId: 1
+      folder: TEFAL
+      type: file
+      disableDeletion: true
+      allowUiUpdates: false
+      options:
+        path: /var/lib/grafana/dashboards/tefal
+
+dashboardsConfigMaps:
+  tefal: tefal-dashboards
