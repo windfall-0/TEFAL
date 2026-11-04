@@ -90,7 +90,7 @@ deploy = {
                             # DB·Loki·Tempo는 원본. 화면에는 '시연용'이 붙는다. 끄려면 빈 문자열.
                             # 공개적으로 인터넷 스캔을 하는 연구·스캐너 기관 IP만 쓴다(역방향 DNS로 확인, 2026-11-04):
                             #   Censys(US) · Shodan(US·IS·NL) · Driftnet/internet-measurement(GB) · Shadowserver(US)
-                            #   · internet-census.org(PT) · ONYPHE(FR 기관, US 위치)
+                            #   · internet-census.org(PT) · ONYPHE(FR 기관, US 위치) · 중국 3개(아래 설명)
                             {"name": "DEMO_SRC_IP_POOL",
                              "value": ",".join([
                                  "162.142.125.10", "167.94.138.35",                 # Censys
@@ -100,7 +100,12 @@ deploy = {
                                  "87.236.176.100", "193.163.125.10",                # Driftnet (GB)
                                  "64.62.197.10",                                    # Shadowserver
                                  "45.156.128.10",                                   # internet-census.org
-                                 "91.230.168.10"])},                                # ONYPHE
+                                 "91.230.168.10",                                   # ONYPHE
+                                 # 중국: 스캐너 기관으로 확인되는 IP가 없어, AbuseIPDB 블랙리스트(신뢰도 100,
+                                 # 2026-11-04 신고)의 클라우드·IDC 대역에서 골랐다. 실제 공격 신고가 쌓인 IP다
+                                 "118.145.148.31",                                  # Volcano Engine (CN)
+                                 "114.67.232.93",                                   # China Unicom Beijing (CN)
+                                 "219.144.80.143"])},                               # Chinanet Shaanxi Cloud Base (CN)
                             # 5단계 AI 해석 (키는 Secret tefal-backend-token의 GEMINI_API_KEY)
                             {"name": "GEMINI_MODEL", "value": "gemini-flash-latest"},
                             {"name": "CACHE_DB", "value": "sqlite:////data/tefal.db"}],
