@@ -1,0 +1,39 @@
+# 경고 단계 매칭 표 (BACKEND_API.md 4.8)
+# 출처: "최종 운영 폴리시 15개를 Sigma 5단계 레벨.txt" (2026-11-04)
+#
+# 분류 원칙
+#   - 차단(enforce) 정책: 발동 = RCE가 실제로 저지됨 → critical
+#   - 관측(observe) 정책: 신호 정확도로 결정. 명확한 공격 행위 high / 정황·전조 medium / 광범위 관측 low
+#
+# 키 = Tetragon policy_name, Falco rule. 표에 없는 룰은 기본값(Tetragon informational, Falco는 priority 기준).
+# 파일이 바뀌면 백엔드가 다시 읽는다. 이미 만든 사건의 단계는 바뀌지 않는다.
+
+tetragon:
+  # ── critical: 능동 차단 (LSM bprm_check_security Override -1)
+  php2shell-lsm-bprmcheck-block:          { level: critical, sigma: "php2shell · LSM · apache → 셸 실행 거부" }
+  log4shell-lsm-bprmcheck-block:          { level: critical, sigma: "log4shell · LSM · JVM → 비java 실행 거부" }
+  react2shell-lsm-bprmcheck-shell-block:  { level: critical, sigma: "react2shell · LSM · node → 셸 실행 거부" }
+
+  # ── high: 고정밀 공격 행위 탐지
+  php2shell-uprobe-zifsystem-observe:     { level: high, sigma: "php2shell · uprobe · zif_system/php_exec 호출" }
+  php2shell-uprobe-popen-observe:         { level: high, sigma: "php2shell · uprobe(libc) · popen/system" }
+  php2shell-kprobe-execve-observe:        { level: high, sigma: "php2shell · kprobe · apache가 /bin/sh 실행" }
+  log4shell-uprobe-forkandexec-observe:   { level: high, sigma: "log4shell · uprobe · JVM forkAndExec" }
+  log4shell-kprobe-execve-observe:        { level: high, sigma: "log4shell · kprobe · java → 셸 실행" }
+  log4shell-kprobe-execveat-observe:      { level: high, sigma: "log4shell · kprobe · execveat(memfd 실행 우회)" }
+  log4shell-kprobe-memfd-observe:         { level: high, sigma: "log4shell · kprobe · memfd_create(파일리스 실행 준비)" }
+  react2shell-uprobe-uvspawn-observe:     { level: high, sigma: "react2shell · uprobe · node uv_spawn" }
+
+  # ── medium: 정황·전조 (상관분석 필요)
+  log4shell-kprobe-fileperm-observe:      { level: medium, sigma: "log4shell · kprobe · java의 /tmp 쓰기" }
+  log4shell-kprobe-tcpconnect-observe:    { level: medium, sigma: "log4shell · kprobe · java 아웃바운드 연결" }
+
+  # ── low: 광범위 관측 (연구용, 상시 운영 아님)
+  react2shell-kprobe-processflow-observe: { level: low, sigma: "react2shell · kprobe · clone/clone3/execve 전반" }
+
+# Cilium 정책은 Tetragon 로그에 나오지 않는다. Hubble 차단 흐름 연결(④ 인프라) 때 쓴다. 지금 백엔드는 이 절을 읽지 않는다.
+cilium:
+  log4shell-egress-block:                 { level: critical, sigma: "log4shell · egress · 아웃바운드 전면 차단" }
+
+# Falco 룰: 표 없음 → priority 기준 기본값 (Critical 이상 critical, Error high, Warning medium, Notice low)
+falco: {}
