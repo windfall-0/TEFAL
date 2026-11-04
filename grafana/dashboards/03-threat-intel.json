@@ -260,12 +260,9 @@
           "showAttribution": true
         },
         "basemap": {
-          "type": "carto",
+          "type": "osm-standard",
           "name": "basemap",
-          "config": {
-            "theme": "dark",
-            "showLabels": true
-          }
+          "config": {}
         },
         "layers": [
           {

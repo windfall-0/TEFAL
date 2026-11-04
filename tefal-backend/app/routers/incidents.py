@@ -38,7 +38,7 @@ def _is_unblocked(status: str) -> bool:
 
 def to_model(inc: Incident, tz: str, demo_pool: list[str] | None = None) -> dict:
     ms = inc.anchor_ms
-    src_ip = demo_ip(inc.src_ip, demo_pool or [])
+    src_ip = demo_ip(inc.src_ip, demo_pool or [], inc.trace_id)
     frac = f"{inc.start_ms % 1000:03d}"
     return {
         "trace_id": inc.trace_id,

@@ -86,10 +86,21 @@ deploy = {
                             {"name": "PROMETHEUS_URL", "value": "http://kube-prometheus-stack-prometheus.monitoring:9090"},
                             # 첫 기동 시 지난 7일 Tetragon 로그로 사건을 만든다 (이후엔 커서부터 이어 읽음)
                             {"name": "COLLECT_BACKFILL_HOURS", "value": "168"},
-                            # 시연 모드: 사건 응답의 내부 출발지 IP를 아래 공인 IP로 바꿔 보여 준다(DB·Loki·Tempo는 원본).
-                            # 공개 인터넷 스캐너(Censys·Shodan) 대역 예시. 끄려면 빈 문자열
+                            # 시연 모드: 사건 응답의 내부 출발지 IP를 아래 공인 IP 중 하나로 바꿔 보여 준다(사건마다 고름).
+                            # DB·Loki·Tempo는 원본. 화면에는 '시연용'이 붙는다. 끄려면 빈 문자열.
+                            # 공개적으로 인터넷 스캔을 하는 연구·스캐너 기관 IP만 쓴다(역방향 DNS로 확인, 2026-11-04):
+                            #   Censys(US) · Shodan(US·IS·NL) · Driftnet/internet-measurement(GB) · Shadowserver(US)
+                            #   · internet-census.org(PT) · ONYPHE(FR 기관, US 위치)
                             {"name": "DEMO_SRC_IP_POOL",
-                             "value": "162.142.125.10,167.94.138.35,206.168.34.20,71.6.199.23,66.240.205.34"},
+                             "value": ",".join([
+                                 "162.142.125.10", "167.94.138.35",                 # Censys
+                                 "71.6.199.23", "66.240.205.34",                    # Shodan (US)
+                                 "82.221.105.6",                                    # Shodan (IS)
+                                 "89.248.167.131", "80.82.77.139",                  # Shodan (NL)
+                                 "87.236.176.100", "193.163.125.10",                # Driftnet (GB)
+                                 "64.62.197.10",                                    # Shadowserver
+                                 "45.156.128.10",                                   # internet-census.org
+                                 "91.230.168.10"])},                                # ONYPHE
                             # 5단계 AI 해석 (키는 Secret tefal-backend-token의 GEMINI_API_KEY)
                             {"name": "GEMINI_MODEL", "value": "gemini-flash-latest"},
                             {"name": "CACHE_DB", "value": "sqlite:////data/tefal.db"}],

@@ -80,3 +80,11 @@ def test_api_masks_only_in_response(settings, auth, pool):
         assert inc.src_ip == "198.51.100.7"
     finally:
         c.__exit__(None, None, None)
+
+
+def test_demo_ip_per_incident_key():
+    # 내부 IP가 하나여도 사건(trace_id)마다 풀 안에서 고루 나뉘고, 같은 사건은 항상 같은 IP
+    picks = {demo_ip("10.233.66.37", POOL, f"{i:032x}") for i in range(60)}
+    assert picks == set(POOL)
+    assert demo_ip("10.233.66.37", POOL, "a" * 32) == demo_ip("10.233.66.37", POOL, "a" * 32)
+    assert demo_ip("8.8.8.8", POOL, "a" * 32) == "8.8.8.8"

@@ -433,7 +433,8 @@ def threat_intel():
           [inf(ips_url, ti_cols)], DS_B,
           {"view": {"id": "zero", "lat": 20, "lon": 10, "zoom": 1.6, "allLayers": True},
            "controls": {"showZoom": True, "mouseWheelZoom": True, "showAttribution": True},
-           "basemap": {"type": "carto", "name": "basemap", "config": {"theme": "dark", "showLabels": True}},
+           # CARTO(Grafana Default 포함)는 키 없는 요청에 'API KEY REQUIRED' 그림을 준다 → OpenStreetMap
+           "basemap": {"type": "osm-standard", "name": "basemap", "config": {}},
            "layers": [{
                "type": "markers", "name": "TI 대상 IP", "tooltip": True,
                "location": {"mode": "coords", "latitude": "lat", "longitude": "lon"},

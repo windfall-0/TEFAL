@@ -52,7 +52,7 @@ async def _targets(request: Request, from_ms: int, to_ms: int) -> dict[str, dict
     incs = await store.query(CommonFilters(from_ms, to_ms, None, None, None))
     out: dict[str, dict] = {}
     for inc in incs:
-        shown = demo_ip(inc.src_ip, pool)  # 시연 모드면 사건 화면과 같은 IP를 쓴다
+        shown = demo_ip(inc.src_ip, pool, inc.trace_id)  # 시연 모드면 사건 화면과 같은 IP를 쓴다
         ip = _public(shown)
         if ip:
             t = out.setdefault(ip, {"roles": set(), "incidents": set(), "pods": set()})

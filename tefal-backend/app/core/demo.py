@@ -4,7 +4,9 @@ NodePort가 master에서 SNAT되어 출발지가 클러스터 내부 IP(10.233.x
 비므로, 시연할 때만 `DEMO_SRC_IP_POOL`의 공인 IP로 바꿔 내보낸다.
 
 - 응답에 실을 때만 바꾼다. 사건 DB, Loki, Tempo에는 원래 값이 그대로 남는다.
-- 같은 내부 IP는 항상 같은 공인 IP로 바뀐다(해시). 이미 공인 IP인 값은 그대로 둔다.
+- 사건마다 고른다(`key` = trace_id 해시). 실제 내부 출발지가 SNAT IP 하나뿐이어도 사건이 풀 안에서 고루
+  나뉘어 지도·평판 표가 다양해진다. 같은 사건은 항상 같은 IP다. `key`가 없으면 내부 IP로 고른다.
+  이미 공인 IP인 값은 그대로 둔다.
 - 풀이 비어 있으면 아무것도 바꾸지 않는다(기본값, 꺼짐).
 """
 
@@ -26,7 +28,7 @@ def parse_pool(raw: str) -> list[str]:
     return list(dict.fromkeys(out))  # 순서 유지 중복 제거
 
 
-def demo_ip(ip: str | None, pool: list[str]) -> str | None:
+def demo_ip(ip: str | None, pool: list[str], key: str | None = None) -> str | None:
     """시연용으로 바꾼 IP. 바꿀 대상이 아니면 받은 값을 그대로 돌려준다."""
     if not ip or not pool:
         return ip
@@ -36,5 +38,6 @@ def demo_ip(ip: str | None, pool: list[str]) -> str | None:
         return ip
     if addr.is_global:
         return ip
-    idx = int.from_bytes(hashlib.sha256(str(addr).encode()).digest()[:8], "big") % len(pool)
+    seed = key if key else str(addr)
+    idx = int.from_bytes(hashlib.sha256(seed.encode()).digest()[:8], "big") % len(pool)
     return pool[idx]
