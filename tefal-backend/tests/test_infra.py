@@ -149,7 +149,6 @@ def test_infra_api(client, app, auth, respx_mock):
     comp = {c["name"]: c["ready_text"] for c in client.get("/infra/components", headers=auth).json()}
     assert comp["Cilium"] == "3/3" and comp["Tempo"] == "없음" and len(comp) == len(infra.DEFAULT_COMPONENTS)
 
-    assert client.get("/network/drops", headers=auth).json() == []
     assert client.get("/infra/nodes").status_code == 401
 
 

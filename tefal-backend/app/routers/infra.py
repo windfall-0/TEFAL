@@ -10,13 +10,16 @@ from fastapi import APIRouter, Query, Request
 
 from app import infra
 from app.core.errors import ApiError
+from app.core.params import parse_time_range
 from app.core.validators import is_valid_k8s_name
+from app.hubble.client import HubbleError, drop_rows
 from app.k8s import K8sClient, K8sError
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["infra"])
 
 CACHE_SEC = 30
+CACHE_MAX_KEYS = 200
 BPF_LSM_CACHE_SEC = 300
 
 
@@ -34,11 +37,15 @@ async def _cached(request: Request, key: str, ttl: float, fn):
         return hit[1]
     try:
         value = await fn()
-    except K8sError as e:
-        log.warning("K8s API 실패: %s", e)
+    except (K8sError, HubbleError) as e:
+        log.warning("조회 실패: %s", e)
         if hit:
             return hit[1]  # 직전 값으로 응답 (3.4 stale)
-        raise ApiError(502, "k8s_error", str(e)) from None
+        code = "hubble_error" if isinstance(e, HubbleError) else "k8s_error"
+        raise ApiError(502, code, str(e)) from None
+    if len(cache) >= CACHE_MAX_KEYS:  # 시간 범위별 키가 쌓이지 않게 오래된 것부터 버린다
+        for k in sorted(cache, key=lambda k: cache[k][0])[: len(cache) // 2]:
+            del cache[k]
     cache[key] = (time.monotonic(), value)
     return value
 
@@ -196,8 +203,21 @@ async def components(request: Request) -> list[dict]:
 
 @router.get("/network/drops")
 async def network_drops(
-    request: Request, limit: Annotated[int, Query(ge=1, le=200)] = 20
+    request: Request,
+    from_: Annotated[int | None, Query(alias="from")] = None,
+    to: int | None = None,
+    namespace: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 20,
 ) -> list[dict]:
-    # Hubble Relay(gRPC) 연결은 다음 단계. 지금은 빈 목록으로 답해 패널이 "막힌 흐름 없음"이 아닌
-    # 안내 문구를 보이게 한다(대시보드 noValue).
-    return []
+    hubble = request.app.state.hubble
+    if hubble is None:
+        raise ApiError(503, "hubble_unavailable", "Hubble 연결이 꺼져 있습니다 (HUBBLE_ENABLED)")
+    ns = (namespace or "").strip() or (request.app.state.settings.watch_namespace_list or ["default"])[0]
+    if not is_valid_k8s_name(ns):
+        raise ApiError(400, "invalid_namespace", "namespace 형식이 올바르지 않습니다")
+    from_ms, to_ms = parse_time_range(from_, to)
+
+    async def build():
+        return drop_rows(await hubble.dropped_flows(ns, from_ms, to_ms), limit)
+
+    return await _cached(request, f"drops:{ns}:{from_ms // 30000}:{to_ms // 30000}:{limit}", CACHE_SEC, build)

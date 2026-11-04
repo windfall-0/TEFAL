@@ -16,12 +16,13 @@ from app.core.cache import SqliteCache
 from app.core.errors import install_error_handlers
 from app.core.logging import setup_logging
 from app.core.metrics import install_metrics_middleware
+from app.hubble.client import HubbleClient
 from app.incidents.collector import Collector, LokiClient
 from app.incidents.levels import SigmaLevels
 from app.incidents.store import IncidentStore
 from app.incidents.tempo import TempoClient
 from app.k8s import K8sClient
-from app.routers import incidents, infra, ingest, ops
+from app.routers import incidents, infra, ingest, ops, policies
 
 
 @asynccontextmanager
@@ -35,6 +36,9 @@ async def lifespan(app: FastAPI):
     app.state.pod_count_cache = {}
     app.state.infra_cache = {}
     app.state.k8s = K8sClient.in_cluster(settings.k8s_api_url) if settings.k8s_enabled else None
+    app.state.hubble = (
+        HubbleClient(settings.hubble_relay_addr, settings.hubble_timeout_sec) if settings.hubble_enabled else None
+    )
     app.state.tempo = (
         TempoClient(app.state.http, settings.tempo_url, settings.tempo_otlp_url)
         if settings.tempo_export_enabled
@@ -61,6 +65,8 @@ async def lifespan(app: FastAPI):
         await app.state.http.aclose()
         if app.state.k8s is not None:
             await app.state.k8s.close()
+        if app.state.hubble is not None:
+            await app.state.hubble.close()
         await app.state.incidents.close()
         await app.state.cache.close()
 
@@ -88,4 +94,4 @@ AUTH = [Depends(require_token)]
 
 
 def _api_routers() -> list[APIRouter]:
-    return [incidents.router, infra.router]
+    return [incidents.router, infra.router, policies.router]

@@ -189,6 +189,9 @@ cnp = {
             {"toEndpoints": [ep(NS, {"app.kubernetes.io/name": "prometheus"})],
              "toPorts": [{"ports": [{"port": "9090", "protocol": "TCP"}]}]},
             {"toEntities": ["kube-apiserver"], "toPorts": [{"ports": [{"port": "6443", "protocol": "TCP"}]}]},
+            # ④ Hubble 차단 흐름: Relay gRPC (Service 80 → 컨테이너 4245, 서버 TLS 꺼짐)
+            {"toEndpoints": [ep("kube-system", {"k8s-app": "hubble-relay"})],
+             "toPorts": [{"ports": [{"port": "4245", "protocol": "TCP"}]}]},
             # initContainer 의존성 설치 (uv sync)
             {"toFQDNs": [{"matchName": "pypi.org"}, {"matchName": "files.pythonhosted.org"}],
              "toPorts": [{"ports": [{"port": "443", "protocol": "TCP"}]}]},

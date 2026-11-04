@@ -268,19 +268,27 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
 ### 5.2 정책 (① 정책 상태)
 
 #### `GET /policies/stats`
+- 파라미터: `from`, `to`, `namespace`(All이면 전체)
 ```json
 [{
-  "policy": "php-uprobe-zif-exec",
-  "tag": "문맥",                  // MITRE ID 또는 설명
-  "layer": "앱 (uprobe)",          // 커널 (LSM) | 커널 + 앱(uprobe) | 앱 (uprobe) | Falco | Falco (커스텀)
-  "action": "기록",                // 차단 (Sigkill) | 기록 | 탐지
-  "hits": 15,
-  "false_positive_suspect": true,
-  "fp_note": "DVWA ping 기능 12회 — 허용 목록 검토"
+  "policy": "php2shell-lsm-bprmcheck-block",
+  "tag": "critical",               // 경고 단계 (4.8, sigma_levels.yaml)
+  "layer": "커널 (LSM)",            // 커널 (LSM) | 커널 (kprobe) | 커널 (tracepoint) | 앱 (uprobe) | Falco | Falco (커스텀)
+  "action": "차단 (Override)",      // 차단 (Override) | 차단 (Sigkill) | 기록 | 탐지
+  "hits": 59,
+  "false_positive_suspect": null,
+  "fp_note": null
 }]
 ```
 
-**오탐 의심 판정 규칙 (설정 가능)**
+구현 (`app/policies.py`, `app/routers/policies.py`):
+- 행: 클러스터의 TracingPolicy 전체(`namespace`를 주면 다른 namespace의 `TracingPolicyNamespaced` 제외) + Falco 커스텀 룰 전체 + 그 namespace에서 맞은 Falco 기본 룰. `Falco internal: ...` 자체 상태 경보는 뺀다. 지금 클러스터에 없는 옛 정책 이름은 히트가 있어도 보이지 않는다.
+- `hits`: Tetragon은 Loki `count_over_time`을 `policy_name`(kprobe·uprobe·lsm·tracepoint)별로, Falco는 `{namespace="falco", container="falco"}` 로그를 `rule`별로 센다. namespace는 각각 `process.pod.namespace`, `output_fields["k8s.ns.name"]`로 거른다. 30초 캐시.
+- `layer`: TracingPolicy spec에 있는 훅 종류(`lsmhooks`, `kprobes`, `tracepoints`, `uprobes`). 여러 개면 `+`로 잇는다.
+- `tag`: Falco 룰은 표에 없으면 룰 정의의 `priority`로 정한다(히트가 없어도 단계가 나온다).
+- **오탐 의심은 아직 판정하지 않는다** (`false_positive_suspect`, `fp_note`가 `null`, 화면은 "—"). 아래 규칙은 다음 단계 안이다.
+
+**오탐 의심 판정 규칙 (다음 단계 안)**
 - 정상 워크로드(`*-normal`, `traffic-gen`) 동작에서 같은 정책이 시간 범위 안에 `FP_THRESHOLD`(기본 5)회 이상 맞으면 의심으로 본다.
 - 공격 pod여도 같은 `binary+args` 패턴이 반복되면 의심으로 보고, 가장 많이 나온 패턴을 `fp_note`에 적는다.
 - 허용 목록(`allowlist.yaml`)에 있는 패턴은 제외한다.
@@ -468,12 +476,20 @@ CPU/메모리 사용률과 노드·pod 수 Stat은 Prometheus가 직접 맡는�
 
 #### `GET /network/drops`
 "네트워크 · 정책에 막힌 흐름 (Hubble)".
-- 파라미터: `from`, `to`, `limit`(기본 20)
+- 파라미터: `from`, `to`, `namespace`(기본 `WATCH_NAMESPACES`의 첫 값), `limit`(기본 20)
 ```json
-[{ "src_pod": "dvwa-7c9f", "dst": "203.0.113.9:4444",
-   "verdict": "DROPPED", "count": 3, "time_ms": 1762146000000 }]
+[{ "src_pod": "vuln-lab/log4shell-5dd4d9dd-z8c2x", "dst": "203.0.113.9 (world) · TCP 4444",
+   "verdict": "DROPPED", "reason": "POLICY_DENIED", "direction": "EGRESS",
+   "policy": "log4shell-egress-block", "count": 3, "time_ms": 1762146000000 }]
 ```
-Hubble Relay `GetFlows`에서 `verdict=DROPPED`, `namespace`를 필터한다. 같은 src→dst는 하나로 합쳐서 `count`에 더하고, `time_ms`는 마지막 시각으로 한다.
+Hubble Relay `GetFlows`에서 `verdict=DROPPED`이고 출발지나 목적지 pod가 그 namespace(`source_pod`/`destination_pod` = `vuln-lab/`)인 흐름을 받는다. 같은 출발→목적지·포트·사유는 하나로 합쳐서 `count`에 더하고, `time_ms`는 마지막 시각으로 한다. 최근 순.
+
+구현 (`app/hubble/`):
+- `grpcio`로 Relay(`HUBBLE_RELAY_ADDR`)에 평문 채널로 붙는다. 이 클러스터 Relay는 `disable-server-tls: true`다. TLS를 켜면 클라이언트도 바꿔야 한다.
+- `app/hubble/pb/`는 Cilium v1.20.2 `api/v1`의 `flow`, `relay`, `observer` proto를 grpcio-tools 1.85.1로 생성한 코드다(import 경로만 `app.hubble.pb.*`로 바꿈). Cilium을 올릴 때 다시 생성한다.
+- 한 번에 최대 2000개 흐름을 받는다. **각 노드 Hubble 링 버퍼(노드당 약 4천 개)에 남은 흐름만 보이므로** 클러스터 전체 트래픽이 많으면 몇 분 전 흐름도 빠진다. 장기 보관이 필요하면 수집기로 따로 쌓아야 한다.
+- 목적지가 pod가 아니면 DNS 이름(`destination_names`) → `IP (world)` 같은 예약 identity → IP 순으로 적는다.
+- Relay 오류는 `502 hubble_error`(직전 값이 있으면 그 값), `HUBBLE_ENABLED=false`면 `503 hubble_unavailable`.
 
 ---
 
@@ -537,7 +553,10 @@ Hubble Relay `GetFlows`에서 `verdict=DROPPED`, `namespace`를 필터한다. �
 | `CORRELATE_MERGE_SEC` | `10` | 연속 차단 병합, 사건 확정 대기 |
 | `FALCO_WAIT_SEC` | `30` | Falco 경보 뒤 차단을 기다리는 시간 |
 | `CORRELATE_MAX_DEPTH` | `8` | ancestors 없이 parent를 따라 올라갈 최대 단계 |
-| `HUBBLE_RELAY_ADDR` | `hubble-relay.kube-system.svc:80` | |
+| `HUBBLE_RELAY_ADDR` | `hubble-relay.kube-system.svc:80` | Relay gRPC (평문) |
+| `HUBBLE_ENABLED` | `true` | ④ 차단 흐름 |
+| `HUBBLE_TIMEOUT_SEC` | `10` | GetFlows 제한 시간 |
+| `LOKI_FALCO_SELECTOR` | `{namespace="falco", container="falco"}` | ① 정책 상태의 Falco 룰 히트 |
 | `K8S_ENABLED` | `true` | ④ 인프라 API. ServiceAccount 토큰이 없으면 자동으로 꺼진다 |
 | `K8S_API_URL` | `https://kubernetes.default.svc` | |
 | `FALCO_RULES_CONFIGMAP` | `falco/falco-rules` | Falco 커스텀 룰 ConfigMap (`namespace/name`) |
@@ -568,7 +587,7 @@ API 키는 K8s `Secret`으로 주입한다. 이미지와 ConfigMap에 넣지 않
   - ClusterRole `tefal-backend-read`: `pods`, `nodes`, `daemonsets`·`deployments`·`statefulsets`, `tracingpolicies`, `tracingpoliciesnamespaced`, `ciliumnetworkpolicies`, `ciliumclusterwidenetworkpolicies`에 `get/list`만 준다.
   - Role `falco/tefal-backend-falco-rules`: ConfigMap `falco-rules` 하나에 `get`만 준다(`resourceNames`).
   - Secret, ConfigMap 목록, `create/update/delete/exec`는 주지 않는다. 실제 클러스터에서 `kubectl auth can-i`로 확인했다.
-- **네트워크:** `CiliumNetworkPolicy`로 ingress는 Grafana, Prometheus(지표 수집), Falcosidekick core(`falco` namespace)만 허용한다. egress는 Tempo(3200, 4318), Loki(3100), Prometheus(9090), K8s API, DNS(nodelocaldns), `pypi.org`·`files.pythonhosted.org`(빌드 없는 배포의 의존성 설치)만 허용한다. Hubble Relay, `api.abuseipdb.com`, `www.virustotal.com`, `generativelanguage.googleapis.com`은 해당 기능 단계에서 추가한다. 현재 정책은 `deploy/backend/gen_backend.py`가 만든다.
+- **네트워크:** `CiliumNetworkPolicy`로 ingress는 Grafana, Prometheus(지표 수집), Falcosidekick core(`falco` namespace)만 허용한다. egress는 Tempo(3200, 4318), Loki(3100), Prometheus(9090), K8s API, Hubble Relay(4245), DNS(nodelocaldns), `pypi.org`·`files.pythonhosted.org`(빌드 없는 배포의 의존성 설치)만 허용한다. `api.abuseipdb.com`, `www.virustotal.com`, `generativelanguage.googleapis.com`은 해당 기능 단계에서 추가한다. 현재 정책은 `deploy/backend/gen_backend.py`가 만든다.
 - **로그 속 비밀값:** Tetragon 이벤트의 `arguments`에는 명령 인자가 그대로 들어 있어서 비밀번호가 섞일 수 있다(실제 클러스터에서 `curl -u admin:<비밀번호>`가 확인됨). AI 프롬프트, 사건 요약, Tempo span 속성에 넣기 전에 `-u user:pass`, `--password=`, `Authorization:`, `token=` 같은 패턴을 `<가림>`으로 바꾼다.
 - **입력 검증:** `trace_id`는 hex 32자, `ip`는 `ipaddress` 모듈로 검증한다. TraceQL/LogQL에 사용자 입력을 문자열로 이어 붙이지 않는다.
 - **로그:** API 키와 Authorization 헤더는 로그에 남기지 않는다.

@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     tempo_export_enabled: bool = True  # 사건 trace 기록 + Beyla 연결
     loki_url: str = "http://loki.monitoring.svc:3100"
     hubble_relay_addr: str = "hubble-relay.kube-system.svc:80"
+    hubble_enabled: bool = True
+    hubble_timeout_sec: float = 10.0
+    loki_falco_selector: str = '{namespace="falco", container="falco"}'
     prometheus_url: str = "http://kube-prometheus-stack-prometheus.monitoring:9090"
     loki_tetragon_selector: str = '{namespace="kube-system", container="export-stdout"}'
 

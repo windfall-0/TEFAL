@@ -11,10 +11,13 @@ dependencies = [
     "aiosqlite>=0.20",
     "prometheus-client>=0.21",
     "tzdata>=2024.2",
+    "grpcio>=1.66",
+    "protobuf>=7.35.1",
 ]
 
 [dependency-groups]
 dev = [
+    "grpcio-tools>=1.85.1",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "respx>=0.21",
@@ -28,3 +31,6 @@ asyncio_default_fixture_loop_scope = "function"
 
 [tool.uv]
 package = false
+
+[tool.ruff]
+extend-exclude = ["app/hubble/pb"]
