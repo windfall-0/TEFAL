@@ -2,6 +2,7 @@
 
 import time
 
+from app import flow
 from app.config import Settings
 from app.incidents import correlate
 from app.incidents.builder import log_incident
@@ -88,6 +89,7 @@ async def ingest_falco(
             falco_ms=t_ms,
         )
 
+    flow.add_falco(inc, rule)  # ① 계층별 방어 흐름 (flow.py)
     await store.save(inc)
     await store.add_members(inc.trace_id, falco_members)
     await store.record_falco(uuid, inc.trace_id)

@@ -20,9 +20,9 @@ from app.config import Settings
 from app.core.cache import SqliteCache
 from app.core.timefmt import fmt_hms
 from app.incidents import correlate, dedup
-from app.incidents.collector import LOKI_INGEST_LAG_SEC
+from app.incidents.events import incident_events
 from app.incidents.store import Incident, IncidentStore
-from app.incidents.tetragon import TetragonEvent, parse_event
+from app.incidents.tetragon import TetragonEvent
 
 log = logging.getLogger(__name__)
 
@@ -193,18 +193,7 @@ class AiService:
         self._locks: dict[str, asyncio.Lock] = {}
 
     async def _events(self, inc: Incident) -> list[TetragonEvent]:
-        keys = await self.store.member_keys(inc.trace_id)
-        if not keys or not re.fullmatch(r"[a-z0-9]([-a-z0-9.]*[a-z0-9])?", inc.pod):
-            return []
-        start = inc.start_ms * 1_000_000 - (self.s.correlate_lookback_sec + 5) * NS
-        end = inc.last_ms * 1_000_000 + LOKI_INGEST_LAG_SEC * NS  # Loki 타임스탬프 = 수집 시각(늦다)
-        lines = await self.loki.query_range(f'{self.s.loki_tetragon_selector} |= "{inc.pod}"', start, end, limit=2000)
-        evs = []
-        for _, line in lines:
-            e = parse_event(line)
-            if e and (e.process.exec_id, e.time_ns, e.event_type) in keys:
-                evs.append(e)
-        return evs
+        return await incident_events(self.store, self.loki, self.s, inc)
 
     async def refresh_allowed(self) -> bool:
         bucket = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M")

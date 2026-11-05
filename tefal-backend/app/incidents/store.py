@@ -37,7 +37,9 @@ CREATE TABLE IF NOT EXISTS incidents (
     beyla_trace_id TEXT,                   -- 연결된 Beyla HTTP trace (span link)
     beyla_link_confidence TEXT,            -- high | low
     beyla_span_id  TEXT,
-    updated_ms     INTEGER NOT NULL
+    updated_ms     INTEGER NOT NULL,
+    layers         TEXT NOT NULL DEFAULT '[]',  -- 걸린 계층 합집합: app | proc | lsm | egress | falco (flow.py)
+    layer_policies TEXT NOT NULL DEFAULT '{}'   -- 계층별 처음 걸린 정책·룰 이름
 );
 CREATE INDEX IF NOT EXISTS incidents_start ON incidents(start_ms);
 CREATE INDEX IF NOT EXISTS incidents_merge ON incidents(node, parent_exec_id, last_ms);
@@ -88,8 +90,8 @@ CREATE TABLE IF NOT EXISTS remote_ips (  -- 감시 pod가 밖으로 연결한 �
 );
 """
 
-COLUMNS = ["trace_id", "start_ms", "anchor_ms", "last_ms", "status", "level", "level_source", "action", "detected_by", "namespace", "pod", "node", "runtime", "runtime_detail", "summary", "mitre", "src_ip", "exec_id", "parent_exec_id", "policy", "container_id", "falco_rules", "falco_ms", "beyla_trace_id", "beyla_link_confidence", "beyla_span_id", "updated_ms"]
-_JSON_COLS = {"mitre", "falco_rules"}
+COLUMNS = ["trace_id", "start_ms", "anchor_ms", "last_ms", "status", "level", "level_source", "action", "detected_by", "namespace", "pod", "node", "runtime", "runtime_detail", "summary", "mitre", "src_ip", "exec_id", "parent_exec_id", "policy", "container_id", "falco_rules", "falco_ms", "beyla_trace_id", "beyla_link_confidence", "beyla_span_id", "updated_ms", "layers", "layer_policies"]
+_JSON_COLS = {"mitre", "falco_rules", "layers", "layer_policies"}
 
 
 @dataclass
@@ -121,6 +123,8 @@ class Incident:
     beyla_link_confidence: str | None = None
     beyla_span_id: str | None = None
     updated_ms: int = 0
+    layers: list[str] = field(default_factory=list)
+    layer_policies: dict[str, str] = field(default_factory=dict)
     member_count: int = 0
 
 
@@ -135,11 +139,12 @@ class Member:
 def _row_to_incident(row: aiosqlite.Row, member_count: int = 0) -> Incident:
     d = {c: row[c] for c in COLUMNS}
     for c in _JSON_COLS:
-        d[c] = json.loads(d[c] or "[]")
+        d[c] = json.loads(d[c] or ("{}" if c == "layer_policies" else "[]"))
     return Incident(**d, member_count=member_count)
 
 
-_ADDED_COLUMNS = {"beyla_trace_id": "TEXT", "beyla_link_confidence": "TEXT", "beyla_span_id": "TEXT"}
+_ADDED_COLUMNS = {"beyla_trace_id": "TEXT", "beyla_link_confidence": "TEXT", "beyla_span_id": "TEXT",
+                  "layers": "TEXT NOT NULL DEFAULT '[]'", "layer_policies": "TEXT NOT NULL DEFAULT '{}'"}
 
 
 async def _migrate(conn: aiosqlite.Connection) -> None:

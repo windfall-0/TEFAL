@@ -16,6 +16,7 @@ from prometheus_client import Counter, Gauge
 from app.config import Settings
 from app.incidents import correlate
 from app.incidents.builder import log_incident, save_cluster
+from app.incidents.events import LOKI_INGEST_LAG_SEC
 from app.incidents.levels import SigmaLevels
 from app.incidents.store import IncidentStore
 from app.incidents.tempo import TempoClient
@@ -25,9 +26,6 @@ log = logging.getLogger(__name__)
 
 NS = 1_000_000_000
 LOKI_LIMIT = 5000
-# Loki 타임스탬프는 이벤트 시각이 아니라 수집 시각이라 수십 초 늦다(확인: 14:48:41 이벤트가 14:49:18).
-# 사건 이벤트를 다시 읽을 때 끝을 이만큼 넉넉히 잡는다. 이벤트 시각으로 다시 거르므로 묶기 결과는 같다.
-LOKI_INGEST_LAG_SEC = 120
 CURSOR_KEY = "tetragon_cursor_ns"
 _POD_RE = re.compile(r"^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$")  # LogQL에 넣기 전 검증
 

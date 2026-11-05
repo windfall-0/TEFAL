@@ -2,6 +2,7 @@
 
 import logging
 
+from app import flow
 from app.config import Settings
 from app.incidents import correlate
 from app.incidents.levels import SigmaLevels, highest
@@ -75,6 +76,7 @@ async def save_cluster(
             times = [t for t in (inc.falco_ms, falco.falco_ms) if t is not None]
             inc.falco_ms = min(times) if times else None
             inc.level, inc.level_source = highest([(inc.level, inc.level_source), (falco.level, falco.level_source)])
+            flow.merge_into(inc, falco)
     elif falco is not None:
         # Falco 선행 경보: 먼저 만든 trace_id를 유지하고 차단으로 바꾼다
         inc = falco
@@ -108,6 +110,7 @@ async def save_cluster(
         )
 
     inc.status = "blocked"
+    flow.add_layers(inc, [*mem, *cluster.anchors])  # ① 계층별 방어 흐름 (flow.py)
     inc.start_ms = min(inc.start_ms, mem[0].time_ns // MS if mem else first_ms)
     inc.last_ms = max(inc.last_ms, last_ms)
     if inc.action != "Sigkill":

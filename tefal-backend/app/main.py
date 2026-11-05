@@ -21,11 +21,12 @@ from app.core.metrics import install_metrics_middleware
 from app.hubble.client import HubbleClient
 from app.incidents.collector import Collector, LokiClient
 from app.incidents.detections import DetectionCollector
+from app.incidents.events import backfill_layers
 from app.incidents.levels import SigmaLevels
 from app.incidents.store import IncidentStore
 from app.incidents.tempo import TempoClient
 from app.k8s import K8sClient
-from app.routers import ai, incidents, infra, ingest, ops, policies, ti
+from app.routers import ai, flow, incidents, infra, ingest, ops, policies, ti
 from app.ti.geo import GeoIP
 from app.ti.service import TiService
 
@@ -71,13 +72,17 @@ async def lifespan(app: FastAPI):
             DetectionCollector(settings, app.state.incidents, loki),
         )
         task = asyncio.create_task(collector.run(), name="tetragon-collector")
+        # ① 계층별 방어 흐름: 지난 사건의 계층을 한 번 채운다 (사건 DB는 다시 만들지 않는다)
+        app.state.backfill = asyncio.create_task(
+            backfill_layers(app.state.incidents, loki, settings, app.state.incidents_lock), name="layers-backfill")
     try:
         yield
     finally:
-        if task is not None:
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+        for t in (task, getattr(app.state, "backfill", None)):
+            if t is not None:
+                t.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await t
         app.state.geo.close()
         await app.state.http.aclose()
         if app.state.k8s is not None:
@@ -111,4 +116,4 @@ AUTH = [Depends(require_token)]
 
 
 def _api_routers() -> list[APIRouter]:
-    return [incidents.router, infra.router, policies.router, ti.router, ai.router]
+    return [incidents.router, infra.router, policies.router, ti.router, ai.router, flow.router]

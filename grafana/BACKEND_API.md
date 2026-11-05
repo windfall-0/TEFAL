@@ -273,6 +273,31 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
 
 ---
 
+### 5.1a 계층별 방어 흐름 (① 맨 위)
+
+#### `GET /flow/summary`
+- 파라미터: `from`, `to`, `namespace`. 사건 필터 중 `runtime`·`status`·`level`은 쓰지 않는다(줄과 칸이 나눈다). 30초 캐시.
+```json
+{ "rows": [
+    { "runtime": "PHP", "incidents": 10, "app": 10, "proc": 10, "lsm": 10, "egress": null,
+      "blocked": 10, "unblocked": 0, "policy": {"app": "zifsystem", "proc": "execve", "lsm": "bprmcheck"},
+      "recent": {"incidents": 0, "app": 0, "proc": 0, "lsm": 0, "egress": null}, "last_block_ms": 1793776000000 },
+    { "runtime": "Java", "...": "..." }, { "runtime": "Node", "...": "..." },
+    { "runtime": "Falco만", "incidents": 15, "blocked": 0, "unblocked": 15, "recent": {"incidents": 0} } ],
+  "last_block_ms": 1793776000000,
+  "flat": { "php_app": 10, "php_app_text": "10", "php_app_recent": 0, "php_app_policy": "zifsystem", "...": "...",
+            "last_block_text": "마지막 차단 3분 전" } }
+```
+- **사건 기준이다.** 칸 숫자 = 그 계층이 사건의 `layers`에 들어 있는 사건 수.
+- 계층(`app/flow.py`): `app` = uprobe 정책 이벤트, `proc` = kprobe·tracepoint, `lsm` = LSM 훅 **차단**(Override·Sigkill), `egress` = 이름에 egress가 든 정책, `falco` = Falco 경보. 사건을 만들거나 합칠 때(`builder.save_cluster`, `falco.ingest_falco`) 구성 이벤트에서 계산해 합집합으로 `incidents.layers`에 저장하고, 계층별 처음 걸린 정책 이름을 `layer_policies`에 둔다.
+- 그 런타임 pod에 걸린 그 계층 정책이 클러스터에 없으면 `null`("해당 없음")이다. TracingPolicy·CNP를 pod 라벨에 맞춰 본다(④ 인프라와 같은 매칭). K8s API를 못 쓰면 모두 있다고 본다.
+- `Falco만` = Tetragon 계층 없이 Falco로만 잡힌 사건. 런타임을 모르는 Tetragon 사건이 있으면 `기타` 줄이 생긴다.
+- `recent` = 최근 5분 안에 시작한 사건. `last_block_ms` = 최근 7일 안 마지막 차단 사건 시각.
+- 정합성: 줄별 `blocked` 합 = `/incidents/summary`의 `blocked_count`, `unblocked` 합 = `unblocked_count`(테스트로 확인).
+- `flat`: Canvas 패널용 한 줄 데이터(`<php|java|node|falco>_<칸>`, `_text`, `_recent`, `_policy`).
+- **지난 사건은 사건 DB를 다시 만들지 않고 채웠다**(2026-11-05). 기동 시 한 번, `layers`가 빈 사건마다 묶인 이벤트를 Loki에서 다시 읽어 계층을 계산한다(`events.backfill_layers`, state `layers_backfill_v1`). 재생성하면 웹훅으로만 받은 Falco 사건이 사라지기 때문이다. span이 바뀌지 않으므로 `TRACE_ID_VERSION`은 5 그대로다.
+- egress: `log4shell-egress-block` CNP가 클러스터에 없고 Hubble 드롭과 사건을 잇는 기록도 없어 지금은 `null`이다.
+
 ### 5.2 정책 (① 정책 상태)
 
 #### `GET /policies/stats`
