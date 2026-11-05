@@ -215,7 +215,7 @@
       "description": "Falco만 탐지하고 Tetragon이 차단하지 못한 사건. 바로 조치가 필요합니다.",
       "gridPos": {
         "x": 0,
-        "y": 0,
+        "y": 9,
         "w": 6,
         "h": 5
       },
@@ -326,7 +326,7 @@
       "description": "Tetragon 인라인 차단(Sigkill·Override) 건수. 선택한 시간 범위 기준.",
       "gridPos": {
         "x": 6,
-        "y": 0,
+        "y": 9,
         "w": 6,
         "h": 5
       },
@@ -414,7 +414,7 @@
       "description": "사건이 1건 이상 발생한 pod 수 / 필터에 걸리는 Running pod 수",
       "gridPos": {
         "x": 12,
-        "y": 0,
+        "y": 9,
         "w": 6,
         "h": 5
       },
@@ -523,7 +523,7 @@
       "description": "DaemonSet Ready 비율과 Alloy/Loki/Tempo scrape 상태. 1이면 정상입니다.",
       "gridPos": {
         "x": 18,
-        "y": 0,
+        "y": 9,
         "w": 6,
         "h": 5
       },
@@ -639,9 +639,9 @@
       "description": "Tetragon·Falco 탐지를 정책·룰의 Sigma level별로 더한 값입니다. 같은 프로세스의 같은 행위가 1초 안에 반복되면 1건으로 셉니다. 공격 1번에 탐지가 여러 건 나오므로 사건 수와 단위가 다릅니다(사건별 단계는 사건 큐의 '단계' 열). namespace·시간 범위만 적용되고 런타임·상태·단계 필터는 적용되지 않습니다. Tetragon은 지금 클러스터에 적용된 정책의 로그만 셉니다. 매칭 표는 tefal-backend의 sigma_levels.yaml, 표에 없는 정책·룰은 Info.",
       "gridPos": {
         "x": 0,
-        "y": 5,
+        "y": 14,
         "w": 24,
-        "h": 4
+        "h": 3
       },
       "datasource": {
         "type": "yesoreyeram-infinity-datasource",
@@ -832,7 +832,7 @@
       "description": "출처: tefal-backend /incidents. 미차단이 먼저, 그다음 최신순. 단계는 Sigma level, 판정 중 = Falco 경보 후 Tetragon 결과 대기.",
       "gridPos": {
         "x": 0,
-        "y": 9,
+        "y": 18,
         "w": 24,
         "h": 10
       },
@@ -1255,7 +1255,7 @@
       "description": "미차단이 많은 워크로드부터 패치·격리합니다.",
       "gridPos": {
         "x": 0,
-        "y": 19,
+        "y": 28,
         "w": 12,
         "h": 8
       },
@@ -1370,7 +1370,7 @@
       "description": "",
       "gridPos": {
         "x": 12,
-        "y": 19,
+        "y": 28,
         "w": 12,
         "h": 8
       },
@@ -1484,7 +1484,7 @@
       "description": "정책별 시간 범위 안 히트 수 (Tetragon·Falco 로그 기준, 같은 프로세스의 같은 행위가 1초 안에 반복되면 1건). 구분 = 경고 단계",
       "gridPos": {
         "x": 0,
-        "y": 27,
+        "y": 36,
         "w": 24,
         "h": 9
       },
@@ -1624,6 +1624,4114 @@
           }
         }
       ]
+    },
+    {
+      "id": 10,
+      "type": "canvas",
+      "title": "계층별 방어 흐름 · 사건 기준",
+      "description": "공격이 앱(uprobe) → 프로세스(kprobe) → 커널(LSM) 순서로 여러 겹 감시되고 어디서 막혔는지 보여 줍니다. 칸 숫자 = 그 계층에 걸린 사건 수(/flow/summary). 주황 테두리 = 최근 5분 안에 시작한 사건. '해당 없음' = 그 런타임 pod에 그 계층 정책이 없음. 칸을 누르면 운영 현황이 그 런타임·상태로 걸러집니다.",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "tefal-backend"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "tefal-backend"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "/flow/summary?from=${__from}&to=${__to}&namespace=${namespace}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "flat",
+          "columns": [
+            {
+              "selector": "php_incidents",
+              "text": "php_incidents",
+              "type": "number"
+            },
+            {
+              "selector": "php_recent",
+              "text": "php_recent",
+              "type": "number"
+            },
+            {
+              "selector": "php_app",
+              "text": "php_app",
+              "type": "number"
+            },
+            {
+              "selector": "php_app_recent",
+              "text": "php_app_recent",
+              "type": "number"
+            },
+            {
+              "selector": "php_app_text",
+              "text": "php_app_text",
+              "type": "string"
+            },
+            {
+              "selector": "php_app_policy",
+              "text": "php_app_policy",
+              "type": "string"
+            },
+            {
+              "selector": "php_proc",
+              "text": "php_proc",
+              "type": "number"
+            },
+            {
+              "selector": "php_proc_recent",
+              "text": "php_proc_recent",
+              "type": "number"
+            },
+            {
+              "selector": "php_proc_text",
+              "text": "php_proc_text",
+              "type": "string"
+            },
+            {
+              "selector": "php_proc_policy",
+              "text": "php_proc_policy",
+              "type": "string"
+            },
+            {
+              "selector": "php_lsm",
+              "text": "php_lsm",
+              "type": "number"
+            },
+            {
+              "selector": "php_lsm_recent",
+              "text": "php_lsm_recent",
+              "type": "number"
+            },
+            {
+              "selector": "php_lsm_text",
+              "text": "php_lsm_text",
+              "type": "string"
+            },
+            {
+              "selector": "php_lsm_policy",
+              "text": "php_lsm_policy",
+              "type": "string"
+            },
+            {
+              "selector": "php_blocked",
+              "text": "php_blocked",
+              "type": "number"
+            },
+            {
+              "selector": "php_blocked_text",
+              "text": "php_blocked_text",
+              "type": "string"
+            },
+            {
+              "selector": "php_unblocked",
+              "text": "php_unblocked",
+              "type": "number"
+            },
+            {
+              "selector": "php_unblocked_text",
+              "text": "php_unblocked_text",
+              "type": "string"
+            },
+            {
+              "selector": "java_incidents",
+              "text": "java_incidents",
+              "type": "number"
+            },
+            {
+              "selector": "java_recent",
+              "text": "java_recent",
+              "type": "number"
+            },
+            {
+              "selector": "java_app",
+              "text": "java_app",
+              "type": "number"
+            },
+            {
+              "selector": "java_app_recent",
+              "text": "java_app_recent",
+              "type": "number"
+            },
+            {
+              "selector": "java_app_text",
+              "text": "java_app_text",
+              "type": "string"
+            },
+            {
+              "selector": "java_app_policy",
+              "text": "java_app_policy",
+              "type": "string"
+            },
+            {
+              "selector": "java_proc",
+              "text": "java_proc",
+              "type": "number"
+            },
+            {
+              "selector": "java_proc_recent",
+              "text": "java_proc_recent",
+              "type": "number"
+            },
+            {
+              "selector": "java_proc_text",
+              "text": "java_proc_text",
+              "type": "string"
+            },
+            {
+              "selector": "java_proc_policy",
+              "text": "java_proc_policy",
+              "type": "string"
+            },
+            {
+              "selector": "java_lsm",
+              "text": "java_lsm",
+              "type": "number"
+            },
+            {
+              "selector": "java_lsm_recent",
+              "text": "java_lsm_recent",
+              "type": "number"
+            },
+            {
+              "selector": "java_lsm_text",
+              "text": "java_lsm_text",
+              "type": "string"
+            },
+            {
+              "selector": "java_lsm_policy",
+              "text": "java_lsm_policy",
+              "type": "string"
+            },
+            {
+              "selector": "java_blocked",
+              "text": "java_blocked",
+              "type": "number"
+            },
+            {
+              "selector": "java_blocked_text",
+              "text": "java_blocked_text",
+              "type": "string"
+            },
+            {
+              "selector": "java_unblocked",
+              "text": "java_unblocked",
+              "type": "number"
+            },
+            {
+              "selector": "java_unblocked_text",
+              "text": "java_unblocked_text",
+              "type": "string"
+            },
+            {
+              "selector": "node_incidents",
+              "text": "node_incidents",
+              "type": "number"
+            },
+            {
+              "selector": "node_recent",
+              "text": "node_recent",
+              "type": "number"
+            },
+            {
+              "selector": "node_app",
+              "text": "node_app",
+              "type": "number"
+            },
+            {
+              "selector": "node_app_recent",
+              "text": "node_app_recent",
+              "type": "number"
+            },
+            {
+              "selector": "node_app_text",
+              "text": "node_app_text",
+              "type": "string"
+            },
+            {
+              "selector": "node_app_policy",
+              "text": "node_app_policy",
+              "type": "string"
+            },
+            {
+              "selector": "node_proc",
+              "text": "node_proc",
+              "type": "number"
+            },
+            {
+              "selector": "node_proc_recent",
+              "text": "node_proc_recent",
+              "type": "number"
+            },
+            {
+              "selector": "node_proc_text",
+              "text": "node_proc_text",
+              "type": "string"
+            },
+            {
+              "selector": "node_proc_policy",
+              "text": "node_proc_policy",
+              "type": "string"
+            },
+            {
+              "selector": "node_lsm",
+              "text": "node_lsm",
+              "type": "number"
+            },
+            {
+              "selector": "node_lsm_recent",
+              "text": "node_lsm_recent",
+              "type": "number"
+            },
+            {
+              "selector": "node_lsm_text",
+              "text": "node_lsm_text",
+              "type": "string"
+            },
+            {
+              "selector": "node_lsm_policy",
+              "text": "node_lsm_policy",
+              "type": "string"
+            },
+            {
+              "selector": "node_blocked",
+              "text": "node_blocked",
+              "type": "number"
+            },
+            {
+              "selector": "node_blocked_text",
+              "text": "node_blocked_text",
+              "type": "string"
+            },
+            {
+              "selector": "node_unblocked",
+              "text": "node_unblocked",
+              "type": "number"
+            },
+            {
+              "selector": "node_unblocked_text",
+              "text": "node_unblocked_text",
+              "type": "string"
+            },
+            {
+              "selector": "falco_incidents",
+              "text": "falco_incidents",
+              "type": "number"
+            },
+            {
+              "selector": "falco_recent",
+              "text": "falco_recent",
+              "type": "number"
+            },
+            {
+              "selector": "falco_unblocked",
+              "text": "falco_unblocked",
+              "type": "number"
+            },
+            {
+              "selector": "falco_unblocked_text",
+              "text": "falco_unblocked_text",
+              "type": "string"
+            },
+            {
+              "selector": "java_egress",
+              "text": "java_egress",
+              "type": "number"
+            },
+            {
+              "selector": "java_egress_text",
+              "text": "java_egress_text",
+              "type": "string"
+            },
+            {
+              "selector": "last_block_text",
+              "text": "last_block_text",
+              "type": "string"
+            }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "inlineEditing": false,
+        "showAdvancedTypes": true,
+        "panZoom": false,
+        "infinitePan": false,
+        "tooltip": {
+          "mode": "details",
+          "disableForOneClick": false
+        },
+        "root": {
+          "type": "frame",
+          "name": "root",
+          "elements": [
+            {
+              "type": "text",
+              "name": "h-runtime",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "런타임"
+                },
+                "size": 12,
+                "color": {
+                  "fixed": "#6B7280"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 0,
+                "top": 0,
+                "right": 92,
+                "bottom": 88
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "h-incidents",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "사건"
+                },
+                "size": 12,
+                "color": {
+                  "fixed": "#6B7280"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 9,
+                "top": 0,
+                "right": 81,
+                "bottom": 88
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "h-app",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "② 앱 탐지"
+                },
+                "size": 12,
+                "color": {
+                  "fixed": "#6B7280"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 23,
+                "top": 0,
+                "right": 64,
+                "bottom": 88
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "h-proc",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "③ 프로세스·시스템콜"
+                },
+                "size": 12,
+                "color": {
+                  "fixed": "#6B7280"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 40,
+                "top": 0,
+                "right": 47,
+                "bottom": 88
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "h-lsm",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "④ 커널 차단 (LSM)"
+                },
+                "size": 12,
+                "color": {
+                  "fixed": "#6B7280"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 57,
+                "top": 0,
+                "right": 30,
+                "bottom": 88
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "h-result",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "결과 (차단 / 미차단)"
+                },
+                "size": 12,
+                "color": {
+                  "fixed": "#6B7280"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 74,
+                "top": 0,
+                "right": 1,
+                "bottom": 88
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "last-block",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "last_block_text",
+                  "fixed": ""
+                },
+                "size": 12,
+                "color": {
+                  "fixed": "#3871DC"
+                },
+                "align": "right",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 0,
+                "top": 88,
+                "right": 1,
+                "bottom": 1
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "php-label",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "PHP"
+                },
+                "size": 15,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "left",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 0,
+                "top": 14,
+                "right": 92,
+                "bottom": 71
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "php-incidents",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "php_incidents",
+                  "fixed": ""
+                },
+                "size": 20,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 20
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 9,
+                "top": 14,
+                "right": 81,
+                "bottom": 71
+              },
+              "background": {
+                "color": {
+                  "field": "php_incidents",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "field": "php_recent",
+                  "fixed": "transparent"
+                },
+                "width": 4,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "php-arrow-app",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "─▶"
+                },
+                "size": 14,
+                "color": {
+                  "fixed": "#9CA3AF"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 19,
+                "top": 14,
+                "right": 77,
+                "bottom": 71
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "php-app",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "php_app_text",
+                  "fixed": ""
+                },
+                "size": 20,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 20
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 23,
+                "top": 14,
+                "right": 64,
+                "bottom": 76.7
+              },
+              "background": {
+                "color": {
+                  "field": "php_app",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "field": "php_app_recent",
+                  "fixed": "transparent"
+                },
+                "width": 4,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "php-app-policy",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "php_app_policy",
+                  "fixed": ""
+                },
+                "size": 10,
+                "color": {
+                  "fixed": "#4B5563"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 23,
+                "top": 23.3,
+                "right": 64,
+                "bottom": 71.0
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "php-arrow-proc",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "─▶"
+                },
+                "size": 14,
+                "color": {
+                  "fixed": "#9CA3AF"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 36,
+                "top": 14,
+                "right": 60,
+                "bottom": 71
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "php-proc",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "php_proc_text",
+                  "fixed": ""
+                },
+                "size": 20,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 20
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 40,
+                "top": 14,
+                "right": 47,
+                "bottom": 76.7
+              },
+              "background": {
+                "color": {
+                  "field": "php_proc",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "field": "php_proc_recent",
+                  "fixed": "transparent"
+                },
+                "width": 4,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "php-proc-policy",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "php_proc_policy",
+                  "fixed": ""
+                },
+                "size": 10,
+                "color": {
+                  "fixed": "#4B5563"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 40,
+                "top": 23.3,
+                "right": 47,
+                "bottom": 71.0
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "php-arrow-lsm",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "─▶"
+                },
+                "size": 14,
+                "color": {
+                  "fixed": "#9CA3AF"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 53,
+                "top": 14,
+                "right": 43,
+                "bottom": 71
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "php-lsm",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "php_lsm_text",
+                  "fixed": ""
+                },
+                "size": 20,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 20
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 57,
+                "top": 14,
+                "right": 30,
+                "bottom": 76.7
+              },
+              "background": {
+                "color": {
+                  "field": "php_lsm",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "field": "php_lsm_recent",
+                  "fixed": "transparent"
+                },
+                "width": 4,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "php-lsm-policy",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "php_lsm_policy",
+                  "fixed": ""
+                },
+                "size": 10,
+                "color": {
+                  "fixed": "#4B5563"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 57,
+                "top": 23.3,
+                "right": 30,
+                "bottom": 71.0
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "php-arrow-result",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "─▶"
+                },
+                "size": 14,
+                "color": {
+                  "fixed": "#9CA3AF"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 70,
+                "top": 14,
+                "right": 26,
+                "bottom": 71
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "php-blocked",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "php_blocked_text",
+                  "fixed": ""
+                },
+                "size": 15,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 15
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 74,
+                "top": 14,
+                "right": 14,
+                "bottom": 71
+              },
+              "background": {
+                "color": {
+                  "field": "php_blocked",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0,
+                "radius": 6
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "php-unblocked",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "php_unblocked_text",
+                  "fixed": ""
+                },
+                "size": 15,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 15
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 87,
+                "top": 14,
+                "right": 1,
+                "bottom": 71
+              },
+              "background": {
+                "color": {
+                  "field": "php_unblocked",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "java-label",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "Java"
+                },
+                "size": 15,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "left",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 0,
+                "top": 32,
+                "right": 92,
+                "bottom": 53
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "java-incidents",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "java_incidents",
+                  "fixed": ""
+                },
+                "size": 20,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 20
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 9,
+                "top": 32,
+                "right": 81,
+                "bottom": 53
+              },
+              "background": {
+                "color": {
+                  "field": "java_incidents",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "field": "java_recent",
+                  "fixed": "transparent"
+                },
+                "width": 4,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "java-arrow-app",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "─▶"
+                },
+                "size": 14,
+                "color": {
+                  "fixed": "#9CA3AF"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 19,
+                "top": 32,
+                "right": 77,
+                "bottom": 53
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "java-app",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "java_app_text",
+                  "fixed": ""
+                },
+                "size": 20,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 20
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 23,
+                "top": 32,
+                "right": 64,
+                "bottom": 58.7
+              },
+              "background": {
+                "color": {
+                  "field": "java_app",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "field": "java_app_recent",
+                  "fixed": "transparent"
+                },
+                "width": 4,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "java-app-policy",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "java_app_policy",
+                  "fixed": ""
+                },
+                "size": 10,
+                "color": {
+                  "fixed": "#4B5563"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 23,
+                "top": 41.3,
+                "right": 64,
+                "bottom": 53.0
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "java-arrow-proc",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "─▶"
+                },
+                "size": 14,
+                "color": {
+                  "fixed": "#9CA3AF"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 36,
+                "top": 32,
+                "right": 60,
+                "bottom": 53
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "java-proc",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "java_proc_text",
+                  "fixed": ""
+                },
+                "size": 20,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 20
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 40,
+                "top": 32,
+                "right": 47,
+                "bottom": 58.7
+              },
+              "background": {
+                "color": {
+                  "field": "java_proc",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "field": "java_proc_recent",
+                  "fixed": "transparent"
+                },
+                "width": 4,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "java-proc-policy",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "java_proc_policy",
+                  "fixed": ""
+                },
+                "size": 10,
+                "color": {
+                  "fixed": "#4B5563"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 40,
+                "top": 41.3,
+                "right": 47,
+                "bottom": 53.0
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "java-arrow-lsm",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "─▶"
+                },
+                "size": 14,
+                "color": {
+                  "fixed": "#9CA3AF"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 53,
+                "top": 32,
+                "right": 43,
+                "bottom": 53
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "java-lsm",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "java_lsm_text",
+                  "fixed": ""
+                },
+                "size": 20,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 20
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 57,
+                "top": 32,
+                "right": 30,
+                "bottom": 58.7
+              },
+              "background": {
+                "color": {
+                  "field": "java_lsm",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "field": "java_lsm_recent",
+                  "fixed": "transparent"
+                },
+                "width": 4,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "java-lsm-policy",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "java_lsm_policy",
+                  "fixed": ""
+                },
+                "size": 10,
+                "color": {
+                  "fixed": "#4B5563"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 57,
+                "top": 41.3,
+                "right": 30,
+                "bottom": 53.0
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "java-arrow-result",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "─▶"
+                },
+                "size": 14,
+                "color": {
+                  "fixed": "#9CA3AF"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 70,
+                "top": 32,
+                "right": 26,
+                "bottom": 53
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "java-blocked",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "java_blocked_text",
+                  "fixed": ""
+                },
+                "size": 15,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 15
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 74,
+                "top": 32,
+                "right": 14,
+                "bottom": 53
+              },
+              "background": {
+                "color": {
+                  "field": "java_blocked",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0,
+                "radius": 6
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "java-unblocked",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "java_unblocked_text",
+                  "fixed": ""
+                },
+                "size": 15,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 15
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 87,
+                "top": 32,
+                "right": 1,
+                "bottom": 53
+              },
+              "background": {
+                "color": {
+                  "field": "java_unblocked",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "java-egress-arrow",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "└▶"
+                },
+                "size": 12,
+                "color": {
+                  "fixed": "#9CA3AF"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 36,
+                "top": 48,
+                "right": 60,
+                "bottom": 46
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "java-egress",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "java_egress_text",
+                  "fixed": ""
+                },
+                "size": 11,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 11
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 40,
+                "top": 48,
+                "right": 47,
+                "bottom": 46
+              },
+              "background": {
+                "color": {
+                  "field": "java_egress",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "java-egress-label",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "egress 차단 (Java)"
+                },
+                "size": 10,
+                "color": {
+                  "fixed": "#6B7280"
+                },
+                "align": "left",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 54,
+                "top": 48,
+                "right": 30,
+                "bottom": 46
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "node-label",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "Node"
+                },
+                "size": 15,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "left",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 0,
+                "top": 57,
+                "right": 92,
+                "bottom": 28
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "node-incidents",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "node_incidents",
+                  "fixed": ""
+                },
+                "size": 20,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 20
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 9,
+                "top": 57,
+                "right": 81,
+                "bottom": 28
+              },
+              "background": {
+                "color": {
+                  "field": "node_incidents",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "field": "node_recent",
+                  "fixed": "transparent"
+                },
+                "width": 4,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "node-arrow-app",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "─▶"
+                },
+                "size": 14,
+                "color": {
+                  "fixed": "#9CA3AF"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 19,
+                "top": 57,
+                "right": 77,
+                "bottom": 28
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "node-app",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "node_app_text",
+                  "fixed": ""
+                },
+                "size": 20,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 20
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 23,
+                "top": 57,
+                "right": 64,
+                "bottom": 33.7
+              },
+              "background": {
+                "color": {
+                  "field": "node_app",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "field": "node_app_recent",
+                  "fixed": "transparent"
+                },
+                "width": 4,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "node-app-policy",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "node_app_policy",
+                  "fixed": ""
+                },
+                "size": 10,
+                "color": {
+                  "fixed": "#4B5563"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 23,
+                "top": 66.3,
+                "right": 64,
+                "bottom": 28.000000000000004
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "node-arrow-proc",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "─▶"
+                },
+                "size": 14,
+                "color": {
+                  "fixed": "#9CA3AF"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 36,
+                "top": 57,
+                "right": 60,
+                "bottom": 28
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "node-proc",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "node_proc_text",
+                  "fixed": ""
+                },
+                "size": 20,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 20
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 40,
+                "top": 57,
+                "right": 47,
+                "bottom": 33.7
+              },
+              "background": {
+                "color": {
+                  "field": "node_proc",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "field": "node_proc_recent",
+                  "fixed": "transparent"
+                },
+                "width": 4,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "node-proc-policy",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "node_proc_policy",
+                  "fixed": ""
+                },
+                "size": 10,
+                "color": {
+                  "fixed": "#4B5563"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 40,
+                "top": 66.3,
+                "right": 47,
+                "bottom": 28.000000000000004
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "node-arrow-lsm",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "─▶"
+                },
+                "size": 14,
+                "color": {
+                  "fixed": "#9CA3AF"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 53,
+                "top": 57,
+                "right": 43,
+                "bottom": 28
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "node-lsm",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "node_lsm_text",
+                  "fixed": ""
+                },
+                "size": 20,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 20
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 57,
+                "top": 57,
+                "right": 30,
+                "bottom": 33.7
+              },
+              "background": {
+                "color": {
+                  "field": "node_lsm",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "field": "node_lsm_recent",
+                  "fixed": "transparent"
+                },
+                "width": 4,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "node-lsm-policy",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "node_lsm_policy",
+                  "fixed": ""
+                },
+                "size": 10,
+                "color": {
+                  "fixed": "#4B5563"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 57,
+                "top": 66.3,
+                "right": 30,
+                "bottom": 28.000000000000004
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "text",
+              "name": "node-arrow-result",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "─▶"
+                },
+                "size": 14,
+                "color": {
+                  "fixed": "#9CA3AF"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 70,
+                "top": 57,
+                "right": 26,
+                "bottom": 28
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "node-blocked",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "node_blocked_text",
+                  "fixed": ""
+                },
+                "size": 15,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 15
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 74,
+                "top": 57,
+                "right": 14,
+                "bottom": 28
+              },
+              "background": {
+                "color": {
+                  "field": "node_blocked",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0,
+                "radius": 6
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "node-unblocked",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "node_unblocked_text",
+                  "fixed": ""
+                },
+                "size": 15,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 15
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 87,
+                "top": 57,
+                "right": 1,
+                "bottom": 28
+              },
+              "background": {
+                "color": {
+                  "field": "node_unblocked",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "falco-label",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "Falco만"
+                },
+                "size": 15,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "left",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 0,
+                "top": 75,
+                "right": 92,
+                "bottom": 10
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "falco-incidents",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "falco_incidents",
+                  "fixed": ""
+                },
+                "size": 20,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 20
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 9,
+                "top": 75,
+                "right": 81,
+                "bottom": 10
+              },
+              "background": {
+                "color": {
+                  "field": "falco_incidents",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "field": "falco_recent",
+                  "fixed": "transparent"
+                },
+                "width": 4,
+                "radius": 6
+              }
+            },
+            {
+              "type": "text",
+              "name": "falco-bar",
+              "config": {
+                "text": {
+                  "mode": "fixed",
+                  "fixed": "──────────  커널 차단 없이 탐지만  ──────────▶"
+                },
+                "size": 12,
+                "color": {
+                  "fixed": "#6B7280"
+                },
+                "align": "center",
+                "valign": "middle"
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 19,
+                "top": 75,
+                "right": 26,
+                "bottom": 10
+              },
+              "background": {
+                "color": {
+                  "fixed": "transparent"
+                }
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0
+              }
+            },
+            {
+              "type": "metric-value",
+              "name": "falco-unblocked",
+              "config": {
+                "text": {
+                  "mode": "field",
+                  "field": "falco_unblocked_text",
+                  "fixed": ""
+                },
+                "size": 15,
+                "color": {
+                  "fixed": "#1F2937"
+                },
+                "align": "center",
+                "valign": "middle",
+                "valueSize": 15
+              },
+              "constraint": {
+                "horizontal": "scale",
+                "vertical": "scale"
+              },
+              "placement": {
+                "left": 87,
+                "top": 75,
+                "right": 1,
+                "bottom": 10
+              },
+              "background": {
+                "color": {
+                  "field": "falco_unblocked",
+                  "fixed": "#D9D9D9"
+                },
+                "radius": 6
+              },
+              "border": {
+                "color": {
+                  "fixed": "transparent"
+                },
+                "width": 0,
+                "radius": 6
+              }
+            }
+          ],
+          "background": {
+            "color": {
+              "fixed": "transparent"
+            }
+          },
+          "border": {
+            "color": {
+              "fixed": "transparent"
+            }
+          },
+          "constraint": {
+            "horizontal": "left",
+            "vertical": "top"
+          },
+          "placement": {}
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": " ",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#D9D9D9",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "php_incidents"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#A5C8F5",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "운영 현황 · PHP",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=PHP"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "php_recent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "php_app"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "운영 현황 · PHP",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=PHP"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "php_app_recent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "php_proc"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "운영 현황 · PHP",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=PHP"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "php_proc_recent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "php_lsm"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "운영 현황 · PHP",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=PHP"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "php_lsm_recent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "php_blocked"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "PHP 차단 사건",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=PHP&var-status=blocked"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "php_unblocked"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF7383",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "미차단 사건",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=PHP&var-status=unblocked"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "java_incidents"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#A5C8F5",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "운영 현황 · Java",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=Java"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "java_recent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "java_app"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "운영 현황 · Java",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=Java"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "java_app_recent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "java_proc"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "운영 현황 · Java",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=Java"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "java_proc_recent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "java_lsm"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "운영 현황 · Java",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=Java"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "java_lsm_recent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "java_blocked"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Java 차단 사건",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=Java&var-status=blocked"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "java_unblocked"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF7383",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "미차단 사건",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=Java&var-status=unblocked"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node_incidents"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#A5C8F5",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "운영 현황 · Node",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=Node"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node_recent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node_app"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "운영 현황 · Node",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=Node"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node_app_recent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node_proc"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "운영 현황 · Node",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=Node"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node_proc_recent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node_lsm"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "운영 현황 · Node",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=Node"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node_lsm_recent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node_blocked"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Node 차단 사건",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=Node&var-status=blocked"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "node_unblocked"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF7383",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "미차단 사건",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-runtime=Node&var-status=unblocked"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "falco_incidents"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#A5C8F5",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "운영 현황 · Falco만 (미차단)",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-status=unblocked"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "falco_recent"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "transparent",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF9830",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "falco_unblocked"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#FF7383",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "미차단 사건",
+                    "url": "/d/tefal-overview?${__url_time_range}&var-status=unblocked"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "java_egress"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#D9D9D9",
+                      "value": null
+                    },
+                    {
+                      "color": "#5794F2",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "color": "#D9D9D9",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

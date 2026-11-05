@@ -212,6 +212,129 @@ INCIDENT_LINK = ("/d/" + UIDS["incident"] + "?var-trace_id=${__data.fields.trace
                  "&from=${__data.fields.window_from_ms}&to=${__data.fields.window_to_ms}")
 
 
+
+# ---------------------------------------------------------------------
+# ① 계층별 방어 흐름 (Canvas). 데이터는 /flow/summary 의 flat 한 줄(사건 기준)
+# ---------------------------------------------------------------------
+FLOW_ROWS = [("php", "PHP"), ("java", "Java"), ("node", "Node")]
+FLOW_COLS = [("app", "② 앱 탐지", 23), ("proc", "③ 프로세스·시스템콜", 40), ("lsm", "④ 커널 차단 (LSM)", 57)]
+FLOW_GREY, FLOW_TEXT, FLOW_RECENT = "#D9D9D9", "#1F2937", "#FF9830"
+
+
+def _el(name, typ, left, top, width, height, config, background=None, border=None):
+    """Canvas 요소. 위치·크기는 패널 대비 % (scale 고정이라 패널 폭이 바뀌어도 비율 유지)."""
+    return {"type": typ, "name": name, "config": config,
+            "constraint": {"horizontal": "scale", "vertical": "scale"},
+            "placement": {"left": left, "top": top, "right": 100 - left - width, "bottom": 100 - top - height},
+            "background": background or {"color": {"fixed": "transparent"}},
+            "border": border or {"color": {"fixed": "transparent"}, "width": 0}}
+
+
+def _txt(text, size=12, color=FLOW_TEXT, field=None, align="center"):
+    t = {"mode": "field", "field": field, "fixed": ""} if field else {"mode": "fixed", "fixed": text}
+    return {"text": t, "size": size, "color": {"fixed": color}, "align": align, "valign": "middle"}
+
+
+def _cell(name, left, top, width, height, value_field, text_field=None, recent_field=None, size=20):
+    """숫자 칸: 배경색은 value_field 값(임계값), 테두리는 최근 5분 활동(recent_field)."""
+    return _el(name, "metric-value", left, top, width, height,
+               {**_txt("", size, field=text_field or value_field), "valueSize": size},
+               background={"color": {"field": value_field, "fixed": FLOW_GREY}, "radius": 6},
+               border={"color": ({"field": recent_field, "fixed": "transparent"} if recent_field
+                                 else {"fixed": "transparent"}), "width": 4 if recent_field else 0, "radius": 6})
+
+
+def flow_panel(b, y):
+    els = []
+    top0, row_h, gap = 14, 15, 3
+    grey = "#6B7280"
+    els.append(_el("h-runtime", "text", 0, 0, 8, 12, _txt("런타임", 12, grey)))
+    els.append(_el("h-incidents", "text", 9, 0, 10, 12, _txt("사건", 12, grey)))
+    for key, title, left in FLOW_COLS:
+        els.append(_el(f"h-{key}", "text", left, 0, 13, 12, _txt(title, 12, grey)))
+    els.append(_el("h-result", "text", 74, 0, 25, 12, _txt("결과 (차단 / 미차단)", 12, grey)))
+    els.append(_el("last-block", "text", 0, 88, 99, 11, _txt("", 12, "#3871DC", field="last_block_text", align="right")))
+    rows = [*FLOW_ROWS, ("falco", "Falco만")]
+    for i, (k, label) in enumerate(rows):
+        t = top0 + i * (row_h + gap) + (7 if k in ("node", "falco") else 0)  # Java 아래 egress 줄 자리
+        els.append(_el(f"{k}-label", "text", 0, t, 8, row_h, _txt(label, 15, align="left")))
+        els.append(_cell(f"{k}-incidents", 9, t, 10, row_h, f"{k}_incidents", recent_field=f"{k}_recent"))
+        if k == "falco":
+            els.append(_el("falco-bar", "text", 19, t, 55, row_h,
+                           _txt("──────────  커널 차단 없이 탐지만  ──────────▶", 12, grey)))
+        else:
+            for key, _, left in FLOW_COLS:
+                els.append(_el(f"{k}-arrow-{key}", "text", left - 4, t, 4, row_h, _txt("─▶", 14, "#9CA3AF")))
+                els.append(_cell(f"{k}-{key}", left, t, 13, row_h * 0.62, f"{k}_{key}",
+                                 text_field=f"{k}_{key}_text", recent_field=f"{k}_{key}_recent"))
+                els.append(_el(f"{k}-{key}-policy", "text", left, t + row_h * 0.62, 13, row_h * 0.38,
+                               _txt("", 10, "#4B5563", field=f"{k}_{key}_policy")))
+            els.append(_el(f"{k}-arrow-result", "text", 70, t, 4, row_h, _txt("─▶", 14, "#9CA3AF")))
+            els.append(_cell(f"{k}-blocked", 74, t, 12, row_h, f"{k}_blocked", text_field=f"{k}_blocked_text", size=15))
+        els.append(_cell(f"{k}-unblocked", 87, t, 12, row_h, f"{k}_unblocked", text_field=f"{k}_unblocked_text",
+                         size=15))
+        if k == "java":  # egress 차단은 Java 줄 아래 작은 칸
+            et = t + row_h + 1
+            els.append(_el("java-egress-arrow", "text", 36, et, 4, 6, _txt("└▶", 12, "#9CA3AF")))
+            els.append(_cell("java-egress", 40, et, 13, 6, "java_egress", text_field="java_egress_text", size=11))
+            els.append(_el("java-egress-label", "text", 54, et, 16, 6, _txt("egress 차단 (Java)", 10, grey, align="left")))
+
+    fields, overrides = [], []
+    url = "/d/" + UIDS["overview"] + "?${__url_time_range}"
+
+    def num(name, kind, links=None):
+        color = {"layer": BLUE, "blocked": BLUE, "unblocked": RED, "incidents": "#A5C8F5"}[kind]
+        props = [{"id": "color", "value": {"mode": "thresholds"}},
+                 {"id": "thresholds", "value": thresholds((None, FLOW_GREY), (1, color))},
+                 {"id": "mappings", "value": [{"type": "special", "options": {
+                     "match": "null", "result": {"color": FLOW_GREY, "index": 0}}}]}]
+        if links:
+            props.append({"id": "links", "value": links})
+        fields.append((name, name, "number"))
+        overrides.append({"matcher": {"id": "byName", "options": name}, "properties": props})
+
+    def recent(name):
+        fields.append((name, name, "number"))
+        overrides.append({"matcher": {"id": "byName", "options": name}, "properties": [
+            {"id": "color", "value": {"mode": "thresholds"}},
+            {"id": "thresholds", "value": thresholds((None, "transparent"), (1, FLOW_RECENT))}]})
+
+    for k, label in [*FLOW_ROWS, ("falco", None)]:
+        rt = f"&var-runtime={label}" if label else ""
+        go = [{"title": f"운영 현황 · {label or 'Falco만 (미차단)'}",
+               "url": url + (rt if label else "&var-status=unblocked")}]
+        num(f"{k}_incidents", "incidents", go)
+        recent(f"{k}_recent")
+        if label:
+            for key, _, _ in FLOW_COLS:
+                num(f"{k}_{key}", "layer", go)
+                recent(f"{k}_{key}_recent")
+                fields.extend([(f"{k}_{key}_text", f"{k}_{key}_text", "string"),
+                               (f"{k}_{key}_policy", f"{k}_{key}_policy", "string")])
+            num(f"{k}_blocked", "blocked", [{"title": f"{label} 차단 사건", "url": url + rt + "&var-status=blocked"}])
+            fields.append((f"{k}_blocked_text", f"{k}_blocked_text", "string"))
+        num(f"{k}_unblocked", "unblocked", [{"title": "미차단 사건", "url": url + rt + "&var-status=unblocked"}])
+        fields.append((f"{k}_unblocked_text", f"{k}_unblocked_text", "string"))
+    num("java_egress", "layer")
+    fields.extend([("java_egress_text", "java_egress_text", "string"), ("last_block_text", "last_block_text", "string")])
+
+    target = inf("/flow/summary?" + TR + "&namespace=${namespace}", fields)
+    target["root_selector"] = "flat"
+    return b.add("canvas", "계층별 방어 흐름 · 사건 기준", 0, y, 24, 9, [target], DS_B,
+                 {"inlineEditing": False, "showAdvancedTypes": True, "panZoom": False, "infinitePan": False,
+                  "tooltip": {"mode": "details", "disableForOneClick": False},
+                  "root": {"type": "frame", "name": "root", "elements": els,
+                           "background": {"color": {"fixed": "transparent"}},
+                           "border": {"color": {"fixed": "transparent"}},
+                           "constraint": {"horizontal": "left", "vertical": "top"}, "placement": {}}},
+                 # 빈 정책 이름 칸에 '0'이 찍히지 않게 값 없음 표시는 공백으로 둔다(숫자 칸은 0이 그대로 온다)
+                 defaults={"noValue": " ", "color": {"mode": "thresholds"}, "thresholds": thresholds((None, FLOW_GREY))},
+                 overrides=overrides,
+                 desc="공격이 앱(uprobe) → 프로세스(kprobe) → 커널(LSM) 순서로 여러 겹 감시되고 어디서 막혔는지 보여 줍니다. "
+                      "칸 숫자 = 그 계층에 걸린 사건 수(/flow/summary). 주황 테두리 = 최근 5분 안에 시작한 사건. "
+                      "'해당 없음' = 그 런타임 pod에 그 계층 정책이 없음. 칸을 누르면 운영 현황이 그 런타임·상태로 걸러집니다.")
+
+
 # =====================================================================
 # ① 운영 현황
 # =====================================================================
@@ -360,6 +483,14 @@ def overview():
         for prop in o["properties"]:
             if prop["id"] == "links" and incident_link not in prop["value"]:
                 prop["value"] = [incident_link, *prop["value"]]
+
+    # 계층별 방어 흐름을 맨 위(필터 줄 바로 아래)에 둔다. 다른 패널은 9칸 내리고 경고 단계 칸은 4 → 3
+    flow_h = 9
+    for panel in b.panels:
+        panel["gridPos"]["y"] += flow_h
+        if panel["title"].startswith("경고 단계별 탐지"):
+            panel["gridPos"]["h"] = 3
+    flow_panel(b, 0)
 
     variables = [
         {"type": "query", "name": "namespace", "label": "namespace", "hide": 0, "datasource": DS_P,

@@ -28,8 +28,9 @@ deploy/
 
 ```bash
 # 대시보드 ConfigMap (저장소의 grafana/dashboards/*.json)
+# 256KB를 넘어 apply의 last-applied 주석 한도를 넘는다 → 처음은 create, 이후는 replace
 kubectl create configmap tefal-dashboards -n monitoring --from-file=dashboards/ --dry-run=client -o yaml \
-  | kubectl label --local -f - app.kubernetes.io/part-of=tefal -o yaml | kubectl apply -f -
+  | kubectl label --local -f - app.kubernetes.io/part-of=tefal -o yaml | kubectl create -f -
 
 # values 적용 (datasources 목록은 통째로 바뀌므로 기존 Loki·Tempo 정의가 tefal-values.yaml에 들어 있다)
 helm upgrade grafana grafana/grafana -n monitoring --version 10.5.15 --reuse-values -f tefal-values.yaml --wait
@@ -116,6 +117,8 @@ kubectl rollout restart deploy/tefal-backend -n monitoring
 ```
 
 - 다시 만들면 사건 trace_id가 모두 바뀐다. 열려 있던 사건 화면은 사건 큐에서 다시 들어간다.
+- **웹훅으로만 받은 Falco 사건(Falco 단독)과 사건에 붙은 Falco 경보는 다시 만들어지지 않는다**(Loki에서 다시 읽는 것은 Tetragon뿐). 계층(`layers`)처럼 지난 사건에 값만 채우면 되는 경우는 다시 만들지 말고 기동 시 채우기(`events.backfill_layers`)처럼 처리한다.
+- 되돌리기용 DB 백업: `kubectl exec … python -c "import sqlite3; sqlite3.connect('/data/tefal.db').backup(sqlite3.connect('/tmp/b.db'))"` 뒤 `kubectl cp`.
 - Loki의 사건 요약 줄은 다시 만들 때마다 한 번씩 더 쌓인다(링크 기능에는 영향 없음).
 
 ## 3. Falcosidekick webhook
