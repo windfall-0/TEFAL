@@ -2,7 +2,8 @@
 
 - 칸 숫자 = 그 계층이 `layers`에 들어 있는 사건 수.
 - 그 런타임 pod에 걸린 그 계층 정책이 클러스터에 없으면 `null`("해당 없음"). K8s API를 못 쓰면 모두 있다고 본다.
-- `Falco만` = Tetragon 계층 없이 Falco로만 잡힌 사건.
+- `Falco 탐지` = Tetragon 계층 없이 Falco로만 잡힌 사건.
+- `html` = ① 패널(Business Text)이 그대로 넣는 화면 (`app/flow_view.py`, 목업 mockups/flow 기준).
 - `recent` = 최근 5분 안에 시작한 사건 기준. `last_block_ms` = 최근 7일 안 마지막 차단 사건.
 - 정합성: 줄별 blocked 합 = `/incidents/summary`의 blocked_count, unblocked 합 = unblocked_count.
   런타임을 모르는 Tetragon 사건이 있으면 `기타` 줄로 넣어 합이 맞게 한다.
@@ -15,7 +16,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 
-from app import flow, infra
+from app import flow, flow_view, infra
 from app.core.params import CommonFilters, common_filters
 from app.core.timefmt import fmt_relative_ko
 from app.routers.infra import _cached, _network_policies, _tracing_policies
@@ -26,7 +27,7 @@ CACHE_SEC = 30
 RECENT_MS = 5 * 60 * 1000
 LAST_BLOCK_RANGE_MS = 7 * 86400 * 1000
 CELLS = ("app", "proc", "lsm", "egress")
-OTHER = "기타"
+OTHER = flow.OTHER
 KEY = {"PHP": "php", "Java": "java", "Node": "node", flow.FALCO_ONLY: "falco", OTHER: "other"}
 
 
@@ -66,16 +67,10 @@ async def available_layers(request: Request, namespace: str | None) -> dict[str,
     return out
 
 
-def row_key(inc) -> str:
-    if not (set(inc.layers) - {"falco"}) and inc.detected_by == "falco":
-        return flow.FALCO_ONLY
-    return inc.runtime if inc.runtime in flow.RUNTIMES else OTHER
-
-
 def build_rows(incs: list, now_ms: int, avail: dict[str, set[str]] | None, last_block: dict[str, int]) -> list[dict]:
     groups: dict[str, list] = {}
     for inc in incs:
-        groups.setdefault(row_key(inc), []).append(inc)
+        groups.setdefault(flow.row_key(inc), []).append(inc)
     rows = []
     for name in (*flow.RUNTIMES, flow.FALCO_ONLY, OTHER):
         items = groups.get(name, [])
@@ -141,11 +136,18 @@ async def summary(request: Request, f: Annotated[CommonFilters, Depends(common_f
         last_block: dict[str, int] = {}
         for i in week:
             if i.status == "blocked":
-                k = row_key(i)
+                k = flow.row_key(i)
                 last_block[k] = max(last_block.get(k, 0), i.start_ms)
         rows = build_rows(incs, now_ms, avail, last_block)
         last = max(last_block.values(), default=None)
-        return {"rows": rows, "last_block_ms": last, "flat": flat(rows, last, now_ms)}
+        fl = flat(rows, last, now_ms)
+        tz = request.app.state.settings.display_tz
+        feed = sorted(incs, key=lambda i: i.start_ms, reverse=True)
+        live = any(now_ms - i.start_ms <= RECENT_MS for i in incs)
+        html = flow_view.render(rows, feed, fl["last_block_text"],
+                                flow_view.range_text(f.from_ms, f.to_ms, now_ms, tz),
+                                flow_view.link_range(f.from_ms, f.to_ms, now_ms), tz, live, now_ms)
+        return {"rows": rows, "last_block_ms": last, "flat": fl, "html": html}
 
     key = f"flow:{f.namespace}:{f.from_ms // 30000}:{f.to_ms // 30000}"
     return await _cached(request, key, CACHE_SEC, build)

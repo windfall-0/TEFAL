@@ -52,12 +52,15 @@ def test_flow_summary_matches_incident_summary(app, settings, auth):
         rows = {r["runtime"]: r for r in d["rows"]}
         php = rows["PHP"]
         assert (php["incidents"], php["app"], php["proc"], php["lsm"], php["blocked"]) == (1, 1, 1, 1, 1)
-        assert php["policy"]["lsm"] == "bprm" and rows["Falco만"]["incidents"] == 1
+        assert php["policy"]["lsm"] == "bprm" and rows["Falco 탐지"]["incidents"] == 1
         assert rows["Java"]["incidents"] == 0 and "기타" not in rows
         # 정합성: 상단 카드와 같은 숫자
         s = c.get("/incidents/summary", params=q, headers=auth).json()
         assert sum(r["blocked"] for r in d["rows"]) == s["blocked_count"]
         assert sum(r["unblocked"] for r in d["rows"]) == s["unblocked_count"]
+        html = d["html"]
+        assert 'class="tf-box tet"' in html and "Falco 탐지" in html and "차단 1" in html
+        assert "<script" not in html and "tf-item" in html and "tf-item new" not in html  # 오래된 사건은 새 줄 표시 없음
         fl = d["flat"]
         assert fl["php_lsm"] == 1 and fl["php_lsm_text"] == "1" and fl["falco_unblocked"] == 1
         assert fl["last_block_text"].startswith("마지막 차단") or fl["last_block_text"] == "최근 7일 차단 없음"
@@ -86,3 +89,26 @@ async def test_backfill_fills_old_incidents_once(settings, store):
     assert (await store.get(inc.trace_id)).layers == ["app", "proc", "lsm"]
     assert await store.get_state(BACKFILL_KEY) == "1"
     assert await backfill_layers(store, FakeLoki(attack_lines()), settings, lock) == 0  # 한 번만
+
+
+def test_flow_view_range_and_escape():
+    from app import flow_view
+    now = 1_800_000_000_000
+    assert flow_view.range_text(now - 86400000, now, now, "Asia/Seoul") == "최근 1일"
+    assert flow_view.range_text(now - 6 * 3600000, now, now, "Asia/Seoul") == "최근 6시간"
+    assert flow_view.range_text(now - 15 * 60000, now, now, "Asia/Seoul") == "최근 15분"
+    assert " ~ " in flow_view.range_text(now - 7200000, now - 3600000, now, "Asia/Seoul")
+    row = {"runtime": "PHP", "incidents": 1, "app": 1, "proc": None, "lsm": 0, "blocked": 1, "unblocked": 0,
+           "policy": {"app": "<img src=x onerror=1>"}, "recent": {"app": 1}}
+    html = flow_view.render([row], [], "x", "최근 1일", {"from": 0, "to": 1}, "Asia/Seoul", False)
+    assert "<img" not in html and "&lt;img" in html and "tf-cell lv1 recent" in html
+    assert "해당 없음" in html and "tf-cell zero" in html and "tf-live" not in html
+
+
+def test_flow_link_range_relative_when_live():
+    from app import flow_view
+    now = 1_800_000_000_000
+    assert flow_view.link_range(now - 86_400_000, now, now) == {"from": "now-1d", "to": "now"}
+    assert flow_view.link_range(now - 5_000 - 21_600_000, now - 5_000, now) == {"from": "now-6h", "to": "now"}
+    assert flow_view.link_range(now - 86_395_000, now, now) == {"from": "now-86395s", "to": "now"}
+    assert flow_view.link_range(1, 2, now) == {"from": 1, "to": 2}

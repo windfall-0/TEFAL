@@ -18,7 +18,8 @@ from app.incidents.tetragon import TetragonEvent
 
 LAYERS = ("app", "proc", "lsm", "egress", "falco")
 RUNTIMES = ("PHP", "Java", "Node")
-FALCO_ONLY = "Falco만"
+OTHER = "기타"
+FALCO_ONLY = "Falco 탐지"  # Tetragon 계층 없이 Falco로만 잡힌 사건
 _PREFIX_RE = re.compile(r"^(php2shell|log4shell|react2shell|r2s)-", re.IGNORECASE)
 _TYPE_RE = re.compile(r"^(uprobe|kprobe|lsm|tracepoint)-", re.IGNORECASE)
 _SUFFIX_RE = re.compile(r"-(observe|block|lab)$", re.IGNORECASE)
@@ -60,6 +61,13 @@ def short_policy(name: str | None) -> str | None:
     if not name:
         return None
     return _SUFFIX_RE.sub("", _TYPE_RE.sub("", _PREFIX_RE.sub("", name))) or name
+
+
+def row_key(inc: Incident) -> str:
+    """흐름 패널의 줄: Falco로만 잡힌 사건은 'Falco 탐지', 나머지는 런타임(모르면 '기타')."""
+    if not (set(inc.layers) - {"falco"}) and inc.detected_by == "falco":
+        return FALCO_ONLY
+    return inc.runtime if inc.runtime in RUNTIMES else OTHER
 
 
 def merge_into(dst: Incident, src: Incident) -> None:
