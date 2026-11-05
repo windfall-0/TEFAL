@@ -25,6 +25,7 @@ log = logging.getLogger(__name__)
 
 ABUSE_URL = "https://api.abuseipdb.com/api/v2/check"
 VT_URL = "https://www.virustotal.com/api/v3/ip_addresses/{ip}"
+IPINFO_URL = "https://ipinfo.io/{ip}/json"
 QUOTA_STOP = 0.9  # 한도의 90%에서 멈춘다
 
 # AbuseIPDB 신고 분류 (https://www.abuseipdb.com/categories)
@@ -82,6 +83,9 @@ class TiService:
             "virustotal_limit": self.s.virustotal_daily_limit,
             "cache_hit": await self.cache.get_counter("ti_cache_hit", day),
             "cache_miss": await self.cache.get_counter("ti_cache_miss", day),
+            "ipinfo_used": await self.cache.get_counter("ipinfo", day),
+            "ipinfo_limit": self.s.ipinfo_daily_limit,
+            "ipinfo_enabled": self.s.ipinfo_token is not None,
             "demo_lookups": await self.cache.get_counter("ti_demo_lookup", day),
         }
 
@@ -136,6 +140,18 @@ class TiService:
         out["vt_total"] = sum(int(v) for v in st.values() if isinstance(v, int))
         return out
 
+    async def _ipinfo(self, ip: str) -> dict | None:
+        """ipinfo.io 무료 플랜: 호스트 이름(역방향 DNS), 도시·지역, 조직(AS + 이름), 시간대."""
+        token = self.s.ipinfo_token
+        if token is None or not await self._quota_ok("ipinfo", self.s.ipinfo_daily_limit):
+            return None
+        await self.cache.incr("ipinfo", _today())
+        r = await self.http.get(IPINFO_URL.format(ip=ip), headers={"Authorization": f"Bearer {token.get_secret_value()}",
+                                                                   "Accept": "application/json"}, timeout=10.0)
+        r.raise_for_status()
+        d = r.json()
+        return {k: d.get(k) for k in ("hostname", "city", "region", "country", "org", "timezone", "postal")}
+
     async def _cached(self, ns: str, ip: str, fetch, allow_fetch: bool) -> tuple[dict | None, bool, float | None]:
         """(값, 캐시에서 왔는지, 저장 시각). 만료됐고 새로 못 가져오면 만료된 값을 준다."""
         hit = await self.cache.get(ns, ip)
@@ -165,8 +181,11 @@ class TiService:
         async with lock:  # 같은 IP 동시 요청은 한 번만 외부로 나간다
             abuse, a_cached, a_at = await self._cached("ti_abuse", ip, self._abuse, allow_fetch)
             vt, v_cached, v_at = await self._cached("ti_vt", ip, self._vt, allow_fetch)
+            ipinfo = None
+            if self.s.ipinfo_token is not None:  # 토큰이 없으면 건너뛴다(캐시 적중률에도 넣지 않는다)
+                ipinfo, _, _ = await self._cached("ti_ipinfo", ip, self._ipinfo, allow_fetch)
         geo = self.geo.lookup(ip)
-        abuse, vt = abuse or {}, vt or {}
+        abuse, vt, ipinfo = abuse or {}, vt or {}, ipinfo or {}
         score = abuse.get("abuse_score")
         checked = max((t for t in (a_at, v_at) if t), default=None)
         country = geo.country or abuse.get("abuse_country")
@@ -199,4 +218,10 @@ class TiService:
             "country_asn": " · ".join(x for x in (country, geo.asn) if x) or None,
             "vt_text": f"{vt.get('vt_malicious', 0)} / {vt_total}" if vt_total is not None else None,
             "abuse_categories_text": ", ".join(abuse.get("abuse_categories") or []) or None,
+            # ipinfo.io (토큰이 있을 때만)
+            "hostname": ipinfo.get("hostname"),
+            "region": ipinfo.get("region"),
+            "org": ipinfo.get("org"),
+            "timezone": ipinfo.get("timezone"),
+            "place_text": ", ".join(x for x in (ipinfo.get("city") or geo.city, ipinfo.get("region")) if x) or None,
         }

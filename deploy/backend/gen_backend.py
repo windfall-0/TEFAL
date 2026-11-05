@@ -216,7 +216,7 @@ cnp = {
              "toPorts": [{"ports": [{"port": "4245", "protocol": "TCP"}]}]},
             # 5단계 위협 인텔리전스·AI 해석 (공인 IP 평판, Gemini)
             {"toFQDNs": [{"matchName": "api.abuseipdb.com"}, {"matchName": "www.virustotal.com"},
-                         {"matchName": "generativelanguage.googleapis.com"}],
+                         {"matchName": "generativelanguage.googleapis.com"}, {"matchName": "ipinfo.io"}],
              "toPorts": [{"ports": [{"port": "443", "protocol": "TCP"}]}]},
             # initContainer 의존성 설치 (uv sync)
             {"toFQDNs": [{"matchName": "pypi.org"}, {"matchName": "files.pythonhosted.org"}],

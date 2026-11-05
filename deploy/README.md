@@ -94,6 +94,8 @@ kubectl rollout restart deploy/tefal-backend -n monitoring
 
 - 키 이름만 확인: `kubectl -n monitoring get secret tefal-backend-token -o jsonpath='{.data}' | grep -o '"[A-Z_]*"'`
 - Gemini 모델은 `gen_backend.py`의 `GEMINI_MODEL`.
+- ipinfo.io 토큰(선택, 무료 플랜)은 나중에 같은 방식으로 더한다. 없으면 IP 상세의 ipinfo 칸은 "토큰 추가 전"으로 비어 있다:
+  `kubectl -n monitoring patch secret tefal-backend-token --type merge -p "$(cat <<'EOF'` / `{"stringData": {"IPINFO_TOKEN": "..."}}` / `EOF` / `)"` 뒤 `kubectl rollout restart deploy/tefal-backend -n monitoring`
 
 ### 경고 단계 표 수정
 

@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     virustotal_per_min: int = 4
     geoip_city_db: str = "/data/GeoLite2-City.mmdb"
     geoip_asn_db: str = "/data/GeoLite2-ASN.mmdb"
+    ipinfo_token: SecretStr | None = None  # 없으면 ipinfo.io 조회를 건너뛴다
+    ipinfo_daily_limit: int = 1500  # 무료 플랜 월 한도를 하루로 나눈 값보다 작게
     gemini_api_key: SecretStr | None = None
     gemini_model: str | None = None
 
@@ -107,6 +109,7 @@ class Settings(BaseSettings):
             self.falco_webhook_token,
             self.abuseipdb_api_key,
             self.virustotal_api_key,
+            self.ipinfo_token,
             self.gemini_api_key,
         ]
         return [s.get_secret_value() for s in secrets if s and s.get_secret_value()]

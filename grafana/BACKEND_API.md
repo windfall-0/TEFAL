@@ -413,6 +413,7 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
 - **시연 IP 표시:** 시연 모드로 바꾼 IP는 `role`이 `출발지 (시연용)`, `demo: true`이고, `notice`에 "시연용 IP입니다. 실제 공격 출발지가 아닙니다"가 붙는다. 사건 응답에는 `src_ip_text`(`<IP> · 시연용`)가 있다. 시연 IP 조회 수는 `/ti/summary`의 `demo_lookups`로 따로 센다.
 - 목록 한 번에 새로 외부 조회하는 IP는 10개까지다. 나머지는 캐시만 쓰고 다음 새로고침에 채운다. `/ti/summary`는 외부 조회를 하지 않는다.
 - AbuseIPDB `check`(verbose, 90일), VirusTotal `ip_addresses/{ip}`(404 = 기록 없음 = 0/0), GeoLite2 City·ASN(`/data/*.mmdb`, PVC).
+- ipinfo.io 무료 플랜(`https://ipinfo.io/{ip}/json`, `IPINFO_TOKEN`): `hostname`(역방향 DNS), `region`, `org`, `timezone`, 표시용 `place_text`(도시, 지역). 토큰이 없으면 조회를 건너뛰고 이 필드는 `null`이다(캐시 적중률에도 넣지 않는다). 24시간 캐시, 하루 `IPINFO_DAILY_LIMIT`의 90%에서 멈춤. `/ti/summary`에 `ipinfo_used`·`ipinfo_limit`·`ipinfo_enabled`.
 - SQLite 캐시 연결은 요청 하나씩 쓰도록 잠근다. Grafana가 패널을 동시에 부를 때 commit과 SELECT가 겹쳐 실패하던 문제를 막는다.
 
 #### `GET /ti/ips`
@@ -431,7 +432,8 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
   "vt_malicious": 6,
   "vt_total": 94,
   "related_incidents": 3,
-  "last_checked": "14:31",
+  "last_attack": "11/05 14:20",   // 표 '공격 시각': 이 IP가 출발지인 사건 중 마지막 사건 끝 시각. 외부 연결만이면 null
+  "last_checked": "14:31",        // 표 'TI 조회': 평판을 조회한 시각
   "asn_isp": "AS[번호] · [호스팅 업체]",   // 표시용
   "vt_text": "6 / 94"                       // 표시용
 }]
@@ -647,6 +649,8 @@ Hubble Relay `GetFlows`에서 `verdict=DROPPED`이고 출발지나 목적지 pod
 | `VIRUSTOTAL_API_KEY` | (필수) | |
 | `VIRUSTOTAL_DAILY_LIMIT` | `500` | |
 | `VIRUSTOTAL_PER_MIN` | `4` | |
+| `IPINFO_TOKEN` | (선택) | ipinfo.io 무료 플랜 토큰. 없으면 ipinfo 조회를 건너뛴다 |
+| `IPINFO_DAILY_LIMIT` | `1500` | |
 | `GEOIP_CITY_DB` | `/data/GeoLite2-City.mmdb` | |
 | `GEOIP_ASN_DB` | `/data/GeoLite2-ASN.mmdb` | |
 | `GEMINI_API_KEY` | (필수) | |
@@ -670,7 +674,7 @@ API 키는 K8s `Secret`으로 주입한다. 이미지와 ConfigMap에 넣지 않
   - ClusterRole `tefal-backend-read`: `pods`, `nodes`, `daemonsets`·`deployments`·`statefulsets`, `tracingpolicies`, `tracingpoliciesnamespaced`, `ciliumnetworkpolicies`, `ciliumclusterwidenetworkpolicies`에 `get/list`만 준다.
   - Role `falco/tefal-backend-falco-rules`: ConfigMap `falco-rules` 하나에 `get`만 준다(`resourceNames`).
   - Secret, ConfigMap 목록, `create/update/delete/exec`는 주지 않는다. 실제 클러스터에서 `kubectl auth can-i`로 확인했다.
-- **네트워크:** `CiliumNetworkPolicy`로 ingress는 Grafana, Prometheus(지표 수집), Falcosidekick core(`falco` namespace)만 허용한다. egress는 Tempo(3200, 4318), Loki(3100), Prometheus(9090), K8s API, Hubble Relay(4245), DNS(nodelocaldns), `pypi.org`·`files.pythonhosted.org`(빌드 없는 배포의 의존성 설치)만 허용한다. `api.abuseipdb.com`, `www.virustotal.com`, `generativelanguage.googleapis.com`(443, 5단계)도 허용한다. 현재 정책은 `deploy/backend/gen_backend.py`가 만든다.
+- **네트워크:** `CiliumNetworkPolicy`로 ingress는 Grafana, Prometheus(지표 수집), Falcosidekick core(`falco` namespace)만 허용한다. egress는 Tempo(3200, 4318), Loki(3100), Prometheus(9090), K8s API, Hubble Relay(4245), DNS(nodelocaldns), `pypi.org`·`files.pythonhosted.org`(빌드 없는 배포의 의존성 설치)만 허용한다. `api.abuseipdb.com`, `www.virustotal.com`, `generativelanguage.googleapis.com`, `ipinfo.io`(443, 5단계)도 허용한다. 현재 정책은 `deploy/backend/gen_backend.py`가 만든다.
 - **로그 속 비밀값:** Tetragon 이벤트의 `arguments`에는 명령 인자가 그대로 들어 있어서 비밀번호가 섞일 수 있다(실제 클러스터에서 `curl -u admin:<비밀번호>`가 확인됨). AI 프롬프트, 사건 요약, Tempo span 속성에 넣기 전에 `-u user:pass`, `--password=`, `Authorization:`, `token=` 같은 패턴을 `<가림>`으로 바꾼다.
 - **입력 검증:** `trace_id`는 hex 32자, `ip`는 `ipaddress` 모듈로 검증한다. TraceQL/LogQL에 사용자 입력을 문자열로 이어 붙이지 않는다.
 - **로그:** API 키와 Authorization 헤더는 로그에 남기지 않는다.

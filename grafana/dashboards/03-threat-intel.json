@@ -1,7 +1,7 @@
 {
   "uid": "tefal-ti",
   "title": "위협 인텔리전스",
-  "description": "출발지 IP 평판(AbuseIPDB·VirusTotal), GeoIP, 파일 해시",
+  "description": "IP 평판(AbuseIPDB·VirusTotal), GeoIP, ipinfo.io",
   "tags": [
     "tefal"
   ],
@@ -228,8 +228,13 @@
               "type": "number"
             },
             {
+              "selector": "last_attack",
+              "text": "공격 시각",
+              "type": "string"
+            },
+            {
               "selector": "last_checked",
-              "text": "최근 조회",
+              "text": "TI 조회",
               "type": "string"
             },
             {
@@ -731,13 +736,13 @@
           "root_selector": "",
           "columns": [
             {
-              "selector": "cache_hit_rate",
-              "text": "적중률",
+              "selector": "cache_ttl_hours",
+              "text": "재조회 간격 (시간)",
               "type": "number"
             },
             {
-              "selector": "cache_ttl_hours",
-              "text": "재조회 간격 (시간)",
+              "selector": "ipinfo_used",
+              "text": "ipinfo 사용",
               "type": "number"
             }
           ],
@@ -780,24 +785,7 @@
             ]
           }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "적중률"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "percentunit"
-              },
-              {
-                "id": "decimals",
-                "value": 0
-              }
-            ]
-          }
-        ]
+        "overrides": []
       }
     },
     {
@@ -874,8 +862,13 @@
               "type": "number"
             },
             {
+              "selector": "last_attack",
+              "text": "공격 시각",
+              "type": "string"
+            },
+            {
               "selector": "last_checked",
-              "text": "최근 조회",
+              "text": "TI 조회",
               "type": "string"
             },
             {
@@ -1096,12 +1089,28 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "최근 조회"
+              "options": "공격 시각"
             },
             "properties": [
               {
                 "id": "custom.width",
-                "value": 90
+                "value": 110
+              },
+              {
+                "id": "noValue",
+                "value": "—"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TI 조회"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
               }
             ]
           },
@@ -1144,9 +1153,10 @@
               "신고 수": 5,
               "VT 악성": 6,
               "관련 사건": 7,
-              "최근 조회": 8,
-              "lat": 9,
-              "lon": 10
+              "공격 시각": 8,
+              "TI 조회": 9,
+              "lat": 10,
+              "lon": 11
             }
           }
         }
@@ -1160,7 +1170,7 @@
       "gridPos": {
         "x": 0,
         "y": 20,
-        "w": 12,
+        "w": 24,
         "h": 5
       },
       "datasource": {
@@ -1324,7 +1334,7 @@
       "gridPos": {
         "x": 0,
         "y": 25,
-        "w": 12,
+        "w": 24,
         "h": 4
       },
       "datasource": {
@@ -1451,14 +1461,14 @@
     },
     {
       "id": 10,
-      "type": "table",
-      "title": "파일 해시 조회 · 업로드된 웹셸",
-      "description": "VirusTotal 파일 해시 조회. Tetragon 로그에 파일 해시가 없어 아직 비어 있습니다 (IMA 해시 수집 정책을 켜면 연결). 기록이 없어도 Tetragon이 행위 기준으로 차단했을 수 있습니다.",
+      "type": "stat",
+      "title": "IP 정보 · ipinfo.io",
+      "description": "ipinfo.io 무료 플랜. 호스트 이름(역방향 DNS)으로 스캐너·클라우드 여부를 알아보기 좋습니다. 토큰(Secret tefal-backend-token의 IPINFO_TOKEN)이 없으면 비어 있습니다. 24시간 캐시.",
       "gridPos": {
-        "x": 12,
-        "y": 20,
-        "w": 12,
-        "h": 9
+        "x": 0,
+        "y": 29,
+        "w": 24,
+        "h": 4
       },
       "datasource": {
         "type": "yesoreyeram-infinity-datasource",
@@ -1475,7 +1485,7 @@
           "source": "url",
           "parser": "backend",
           "format": "table",
-          "url": "/ti/files?from=${__from}&to=${__to}&ip=${ip}",
+          "url": "/ti/ip/${ip}",
           "url_options": {
             "method": "GET",
             "data": ""
@@ -1483,23 +1493,23 @@
           "root_selector": "",
           "columns": [
             {
-              "selector": "path",
-              "text": "파일",
+              "selector": "hostname",
+              "text": "호스트 이름",
               "type": "string"
             },
             {
-              "selector": "sha256",
-              "text": "SHA-256",
+              "selector": "place_text",
+              "text": "도시 / 지역",
               "type": "string"
             },
             {
-              "selector": "vt_malicious",
-              "text": "VT 악성",
-              "type": "number"
+              "selector": "org",
+              "text": "조직",
+              "type": "string"
             },
             {
-              "selector": "message",
-              "text": "판정",
+              "selector": "timezone",
+              "text": "시간대",
               "type": "string"
             }
           ],
@@ -1507,97 +1517,44 @@
         }
       ],
       "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "footer": {
-          "show": false
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/"
+        },
+        "textMode": "value_and_name",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 11,
+          "valueSize": 16
         }
       },
       "fieldConfig": {
         "defaults": {
-          "custom": {
-            "align": "left",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "inspect": true
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
           },
-          "noValue": "파일 해시 수집 전 (Tetragon IMA 해시 정책 필요)"
+          "noValue": "ipinfo 토큰 추가 전 (IPINFO_TOKEN)",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "VT 악성"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 80
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "thresholds"
-                }
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "#5794F2",
-                      "value": null
-                    },
-                    {
-                      "color": "#FF7383",
-                      "value": 1
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "SHA-256"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 200
-              }
-            ]
-          }
-        ]
-      },
-      "links": [
-        {
-          "title": "관련 사건 보기 →",
-          "url": "/d/tefal-overview?${__url_time_range}"
-        }
-      ],
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "indexByName": {
-              "파일": 0,
-              "SHA-256": 1,
-              "VT 악성": 2,
-              "판정": 3
-            }
-          }
-        }
-      ]
+        "overrides": []
+      }
     }
   ]
 }

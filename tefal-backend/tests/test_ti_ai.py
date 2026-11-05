@@ -1,5 +1,7 @@
 """5단계: 위협 인텔리전스(/ti)와 AI 해석(/ai). 외부 API는 respx로 흉내 낸다."""
 
+import re
+
 import httpx
 import pytest
 import respx
@@ -106,6 +108,7 @@ async def test_ti_api_targets_src_and_outbound(app, settings, auth):
             _mock_ti(m)
             rows = c.get("/ti/ips", params=q, headers=auth).json()
             assert [(r["ip"], r["role"], r["related_incidents"]) for r in rows] == [(PUB, "외부 연결", 1)]
+            assert rows[0]["last_attack"] is None  # 외부 연결은 공격 시각이 없다
             assert c.get("/ti/ips", params={**q, "min_abuse": 90}, headers=auth).json() == []
             s = c.get("/ti/summary", params=q, headers=auth).json()
             assert s["public_ip_count"] == 1 and s["high_risk_count"] == 1 and s["abuseipdb_used"] == 1
@@ -240,6 +243,7 @@ def test_ti_demo_ips_are_labeled(settings, auth):
             assert c.get(f"/incidents/{tid}", headers=auth).json()["src_ip_text"] == f"{PUB} · 시연용"
             rows = c.get("/ti/ips", params=q, headers=auth).json()
             assert [(r["ip"], r["role"], r["demo"]) for r in rows] == [(PUB, "출발지 (시연용)", True)]
+            assert re.fullmatch(r"\d\d/\d\d \d\d:\d\d", rows[0]["last_attack"])
             d = c.get(f"/ti/ip/{PUB}", headers=auth).json()
             assert d["demo"] is True and d["notice"] == "시연용 IP · 실제 출발지 아님"
             sm = c.get("/ti/summary", params=q, headers=auth).json()
@@ -281,3 +285,32 @@ def test_masker_hides_lab_names():
     out = m("vuln-lab/react2shell-dfcb7fc4f-gwm8b R2S-final-shell-block react2shell:latest Shell Spawned in Vuln Lab")
     assert "react2shell" not in out.lower() and "vuln" not in out.lower() and "r2s" not in out.lower()
     assert m.leaks(out) == []
+
+
+async def test_ipinfo_with_and_without_token(settings, tmp_path):
+    from app.ti.service import IPINFO_URL
+    cache = await SqliteCache.open(str(tmp_path / "i.db"))
+    async with httpx.AsyncClient() as http:
+        # 토큰이 없으면 ipinfo.io를 부르지 않고 필드는 비어 있다
+        no_token = TiService(_keys(settings), cache, http, FakeGeo())
+        with respx.mock(assert_all_called=False) as m:
+            _mock_ti(m)
+            route = m.get(IPINFO_URL.format(ip=PUB)).mock(return_value=httpx.Response(200, json={}))
+            r = await no_token.lookup(PUB)
+        assert route.call_count == 0 and r["hostname"] is None and r["place_text"] == "Mountain View"
+
+        s = _keys(settings).model_copy(update={"ipinfo_token": SecretStr("t" * 14)})
+        ti = TiService(s, cache, http, FakeGeo())
+        with respx.mock(assert_all_called=False) as m:
+            _mock_ti(m)
+            route = m.get(IPINFO_URL.format(ip=PUB)).mock(return_value=httpx.Response(200, json={
+                "ip": PUB, "hostname": "dns.google", "city": "Mountain View", "region": "California",
+                "country": "US", "org": "AS15169 Google LLC", "timezone": "America/Los_Angeles"}))
+            r = await ti.lookup(PUB)
+            await ti.lookup(PUB)  # 24시간 캐시
+        assert route.call_count == 1 and route.calls[0].request.headers["Authorization"] == "Bearer " + "t" * 14
+        assert r["hostname"] == "dns.google" and r["org"] == "AS15169 Google LLC"
+        assert r["place_text"] == "Mountain View, California" and r["timezone"] == "America/Los_Angeles"
+        u = await ti.usage()
+        assert u["ipinfo_used"] == 1 and u["ipinfo_enabled"] is True
+    await cache.close()

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query, Request
 from app.core.demo import demo_ip
 from app.core.errors import ApiError
 from app.core.params import CommonFilters, parse_time_range
-from app.core.timefmt import fmt_hm
+from app.core.timefmt import fmt_hm, fmt_md
 from app.core.validators import is_public_ip, parse_ip
 from app.ti.service import TiService
 
@@ -58,6 +58,7 @@ async def _targets(request: Request, from_ms: int, to_ms: int) -> dict[str, dict
             t = out.setdefault(ip, {"roles": set(), "incidents": set(), "pods": set()})
             t["roles"].add("demo" if shown != inc.src_ip else "src")
             t["incidents"].add(inc.trace_id)
+            t["last_attack_ms"] = max(t.get("last_attack_ms", 0), inc.last_ms)  # 출발지 사건만 (외부 연결은 공격이 아니다)
     for r in await store.remote_ips(from_ms * 1_000_000, to_ms * 1_000_000):
         ip = _public(r["ip"])  # 수집기도 공인 IP만 쌓지만 외부로 나가기 전에 한 번 더 막는다
         if ip is None:
@@ -83,6 +84,8 @@ async def _rows(request: Request, from_ms: int, to_ms: int) -> list[dict]:
         row["related_incidents"] = len(t["incidents"])
         row["related_pods"] = ", ".join(sorted(t["pods"]))
         row["last_checked"] = _checked(row.pop("checked_at"), tz)
+        at = t.get("last_attack_ms")
+        row["last_attack"] = f"{fmt_md(at, tz)} {fmt_hm(at, tz)}" if at else None
         rows.append(row)
     return rows
 
@@ -132,6 +135,7 @@ async def summary(
         "high_risk_count": high,
         "abuseipdb_used": u["abuseipdb_used"], "abuseipdb_limit": u["abuseipdb_limit"],
         "virustotal_used": u["virustotal_used"], "virustotal_limit": u["virustotal_limit"],
+        "ipinfo_used": u["ipinfo_used"], "ipinfo_limit": u["ipinfo_limit"], "ipinfo_enabled": u["ipinfo_enabled"],
         "cache_ttl_hours": request.app.state.settings.ti_cache_ttl_hours,
         "cache_hit_rate": round(u["cache_hit"] / looked, 3) if looked else None,
         "demo_mode": bool(request.app.state.settings.demo_src_ip_list),

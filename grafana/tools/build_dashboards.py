@@ -482,13 +482,13 @@ def incident():
 
     b.add("stat", "출발지 IP 요약", 16, 19, 8, 9,
           [inf("/ti/ip/${src_ip}",
-               [("ip", "IP", "string"), ("country_asn", "국가 / ASN", "string"),
+               [("ip", "IP", "string"), ("hostname", "호스트", "string"), ("country_asn", "국가 / ASN", "string"),
                 ("abuse_score", "AbuseIPDB 점수", "number"), ("vt_text", "VirusTotal", "string"),
                 ("notice", "안내", "string")])],
           DS_B, {**stat_opts(fields="/.*/", size=(12, 18)), "orientation": "horizontal"},
           defaults={"color": fixed("text"), "noValue": "출발지 IP 확인 불가 · 사설 IP는 평판 조회를 하지 않음",
                     "thresholds": thresholds((None, "text"))},
-          overrides=[ov("AbuseIPDB 점수", unit="none", max=100, color={"mode": "thresholds"},
+          overrides=[ov("호스트", noValue="—"), ov("AbuseIPDB 점수", unit="none", max=100, color={"mode": "thresholds"},
                         thresholds=thresholds((None, GREY), (25, ORANGE), (75, RED)))],
           links=[{"title": "TI 탭에서 보기 →",
                   "url": "/d/" + UIDS["ti"] + "?var-ip=${src_ip}&from=now-24h&to=now"}])
@@ -514,7 +514,7 @@ def threat_intel():
                ("asn_isp", "ASN / ISP", "string"),
                ("abuse_score", "Abuse 점수", "number"), ("abuse_reports", "신고 수", "number"),
                ("vt_text", "VT 악성", "string"), ("related_incidents", "관련 사건", "number"),
-               ("last_checked", "최근 조회", "string"),
+               ("last_attack", "공격 시각", "string"), ("last_checked", "TI 조회", "string"),
                ("lat", "lat", "number"), ("lon", "lon", "number")]
     ips_url = "/ti/ips?" + TR + "&min_abuse=${min_abuse}"
     abuse_thr = thresholds((None, GREY), (25, ORANGE), (75, RED))
@@ -556,10 +556,9 @@ def threat_intel():
           DS_B, stat_opts(size=(11, 22)), defaults={"color": fixed("text"), "thresholds": thresholds((None, "text"))},
           overrides=[ov("일일 한도", color=fixed(GREY))])
     b.add("stat", "캐시", 16, 8, 8, 4,
-          [inf(sum_url, [("cache_hit_rate", "적중률", "number"), ("cache_ttl_hours", "재조회 간격 (시간)", "number")])],
+          [inf(sum_url, [("cache_ttl_hours", "재조회 간격 (시간)", "number"), ("ipinfo_used", "ipinfo 사용", "number")])],
           DS_B, stat_opts(size=(11, 22)),
           defaults={"color": fixed("text"), "thresholds": thresholds((None, "text"))},
-          overrides=[ov("적중률", unit="percentunit", decimals=0)],
           desc="같은 IP는 TTL 동안 재조회하지 않습니다.")
 
     b.add("table", "IP 평판 · AbuseIPDB + VirusTotal", 0, 12, 24, 8,
@@ -578,13 +577,14 @@ def threat_intel():
               ov("신고 수", custom__width=80), ov("VT 악성", custom__width=90),
               ov("관련 사건", custom__width=90, color=fixed(BLUE), custom__cellOptions={"type": "color-text"},
                  links=[{"title": "운영 현황 사건 큐", "url": "/d/" + UIDS["overview"] + "?${__url_time_range}"}]),
-              ov("최근 조회", custom__width=90),
+              ov("공격 시각", custom__width=110, noValue="—"),
+              ov("TI 조회", custom__width=80),
               hide("lat"), hide("lon"),
           ],
           desc="출처: tefal-backend /ti (Infinity)")
 
     ip_url = "/ti/ip/${ip}"
-    b.add("stat", "선택 IP 상세 · ${ip}", 0, 20, 12, 5,
+    b.add("stat", "선택 IP 상세 · ${ip}", 0, 20, 24, 5,
           [inf(ip_url, [("abuse_score", "Abuse 신뢰 점수", "number"), ("last_reported", "최근 신고", "string"),
                         ("usage_type", "용도", "string"), ("is_tor", "Tor 노드", "string"),
                         ("notice", "안내", "string")])],
@@ -595,7 +595,7 @@ def threat_intel():
                      ov("Tor 노드", mappings=[{"type": "value", "options": {
                          "true": {"text": "예", "color": RED, "index": 0},
                          "false": {"text": "아니오", "index": 1}}}])])
-    b.add("stat", "AbuseIPDB 신고 분류 · VirusTotal 판정", 0, 25, 12, 4,
+    b.add("stat", "AbuseIPDB 신고 분류 · VirusTotal 판정", 0, 25, 24, 4,
           [inf(ip_url, [("abuse_categories_text", "신고 분류", "string"),
                         ("vt_malicious", "악성", "number"), ("vt_suspicious", "의심", "number"),
                         ("vt_harmless", "무해", "number"), ("vt_undetected", "미분류", "number")])],
@@ -603,24 +603,18 @@ def threat_intel():
           defaults={"color": fixed("text"), "noValue": "—", "thresholds": thresholds((None, "text"))},
           overrides=[ov("악성", color=fixed(RED)), ov("의심", color=fixed(ORANGE))])
 
-    b.add("table", "파일 해시 조회 · 업로드된 웹셸", 12, 20, 12, 9,
-          [inf("/ti/files?" + TR + "&ip=${ip}",
-               [("path", "파일", "string"), ("sha256", "SHA-256", "string"),
-                ("vt_malicious", "VT 악성", "number"), ("message", "판정", "string")])],
-          DS_B, table_opts(),
-          defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}, "inspect": True},
-                    "noValue": "파일 해시 수집 전 (Tetragon IMA 해시 정책 필요)"},
-          overrides=[ov("VT 악성", custom__width=80, color={"mode": "thresholds"},
-                        thresholds=thresholds((None, BLUE), (1, RED)),
-                        custom__cellOptions={"type": "color-text"}),
-                     ov("SHA-256", custom__width=200)],
-          links=[{"title": "관련 사건 보기 →", "url": "/d/" + UIDS["overview"] + "?${__url_time_range}"}],
-          desc="VirusTotal 파일 해시 조회. Tetragon 로그에 파일 해시가 없어 아직 비어 있습니다 "
-               "(IMA 해시 수집 정책을 켜면 연결). 기록이 없어도 Tetragon이 행위 기준으로 차단했을 수 있습니다.")
+    b.add("stat", "IP 정보 · ipinfo.io", 0, 29, 24, 4,
+          [inf(ip_url, [("hostname", "호스트 이름", "string"), ("place_text", "도시 / 지역", "string"),
+                        ("org", "조직", "string"), ("timezone", "시간대", "string")])],
+          DS_B, stat_opts(fields="/.*/", size=(11, 16)),
+          defaults={"color": fixed("text"), "noValue": "ipinfo 토큰 추가 전 (IPINFO_TOKEN)",
+                    "thresholds": thresholds((None, "text"))},
+          desc="ipinfo.io 무료 플랜. 호스트 이름(역방향 DNS)으로 스캐너·클라우드 여부를 알아보기 좋습니다. "
+               "토큰(Secret tefal-backend-token의 IPINFO_TOKEN)이 없으면 비어 있습니다. 24시간 캐시.")
 
     variables = [textbox("ip", "IP 조회"), textbox("min_abuse", "최소 Abuse 점수", "0")]
     return dashboard("ti", "위협 인텔리전스", b, variables, time_from="now-24h",
-                     desc="출발지 IP 평판(AbuseIPDB·VirusTotal), GeoIP, 파일 해시")
+                     desc="IP 평판(AbuseIPDB·VirusTotal), GeoIP, ipinfo.io")
 
 
 # =====================================================================

@@ -659,6 +659,11 @@
               "type": "string"
             },
             {
+              "selector": "hostname",
+              "text": "호스트",
+              "type": "string"
+            },
+            {
               "selector": "country_asn",
               "text": "국가 / ASN",
               "type": "string"
@@ -720,6 +725,18 @@
           }
         },
         "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "호스트"
+            },
+            "properties": [
+              {
+                "id": "noValue",
+                "value": "—"
+              }
+            ]
+          },
           {
             "matcher": {
               "id": "byName",
