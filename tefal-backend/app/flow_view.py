@@ -111,7 +111,7 @@ def render(rows: list[dict], feed: list, last_block_text: str, rng: str, tr: dic
                + "".join(_row(r, tr) for r in tet) + "</div>")
     fal_box = ""
     if fal is not None:
-        fal_box = ('<div class="tf-box fal"><span class="tf-tag">Falco · 탐지 전용 (차단 없음)</span>'
+        fal_box = ('<div class="tf-box fal"><span class="tf-tag">Falco · 탐지 전용</span>'
                    f'<a class="tf-falrow" href="{_href(OVERVIEW, **tr, **{"var-status": "unblocked"})}">'
                    f'<span class="tf-name">{escape(fal["runtime"])}</span><span class="tf-inc">{fal["incidents"]}</span>'
                    '<span class="tf-dash"><i></i>커널 차단 없이 탐지만<i></i></span>'
