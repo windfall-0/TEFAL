@@ -110,6 +110,8 @@ def flat(rows: list[dict], last_block_ms: int | None, now_ms: int) -> dict:
         k = KEY[r["runtime"]]
         for f in ("incidents", "blocked", "unblocked"):
             out[f"{k}_{f}"] = r[f]
+        out[f"{k}_blocked_text"] = f"차단 {r['blocked']}"
+        out[f"{k}_unblocked_text"] = f"미차단 {r['unblocked']}"
         out[f"{k}_recent"] = r["recent"]["incidents"]
         for layer in CELLS:
             if layer not in r:
