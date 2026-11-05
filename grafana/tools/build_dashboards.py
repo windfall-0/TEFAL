@@ -214,125 +214,23 @@ INCIDENT_LINK = ("/d/" + UIDS["incident"] + "?var-trace_id=${__data.fields.trace
 
 
 # ---------------------------------------------------------------------
-# ① 계층별 방어 흐름 (Canvas). 데이터는 /flow/summary 의 flat 한 줄(사건 기준)
+# ① 계층별 방어 흐름 (Business Text). 화면 HTML은 백엔드 /flow/summary 의 html (app/flow_view.py),
+# 모양은 목업 mockups/flow(2026-11-05 확정). 여기에는 스타일만 둔다.
 # ---------------------------------------------------------------------
-FLOW_ROWS = [("php", "PHP"), ("java", "Java"), ("node", "Node")]
-FLOW_COLS = [("app", "② 앱 탐지", 23), ("proc", "③ 프로세스·시스템콜", 40), ("lsm", "④ 커널 차단 (LSM)", 57)]
-FLOW_GREY, FLOW_TEXT, FLOW_RECENT = "#D9D9D9", "#1F2937", "#FF9830"
-
-
-def _el(name, typ, left, top, width, height, config, background=None, border=None):
-    """Canvas 요소. 위치·크기는 패널 대비 % (scale 고정이라 패널 폭이 바뀌어도 비율 유지)."""
-    return {"type": typ, "name": name, "config": config,
-            "constraint": {"horizontal": "scale", "vertical": "scale"},
-            "placement": {"left": left, "top": top, "right": 100 - left - width, "bottom": 100 - top - height},
-            "background": background or {"color": {"fixed": "transparent"}},
-            "border": border or {"color": {"fixed": "transparent"}, "width": 0}}
-
-
-def _txt(text, size=12, color=FLOW_TEXT, field=None, align="center"):
-    t = {"mode": "field", "field": field, "fixed": ""} if field else {"mode": "fixed", "fixed": text}
-    return {"text": t, "size": size, "color": {"fixed": color}, "align": align, "valign": "middle"}
-
-
-def _cell(name, left, top, width, height, value_field, text_field=None, recent_field=None, size=20):
-    """숫자 칸: 배경색은 value_field 값(임계값), 테두리는 최근 5분 활동(recent_field)."""
-    return _el(name, "metric-value", left, top, width, height,
-               {**_txt("", size, field=text_field or value_field), "valueSize": size},
-               background={"color": {"field": value_field, "fixed": FLOW_GREY}, "radius": 6},
-               border={"color": ({"field": recent_field, "fixed": "transparent"} if recent_field
-                                 else {"fixed": "transparent"}), "width": 4 if recent_field else 0, "radius": 6})
+FLOW_CSS = ".tf{font-family:Inter,'Noto Sans KR',system-ui,sans-serif;color:#111827;display:flex;flex-direction:column;gap:12px;height:100%;padding:6px 10px;box-sizing:border-box}.tf a{text-decoration:none;color:inherit}.tf-head{display:flex;justify-content:space-between;align-items:center}.tf-title b{font-size:16px}.tf-title span{font-size:12px;color:#4B5563;margin-left:10px}.tf-meta{display:flex;gap:14px;align-items:center;font-size:12px}.tf-live{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:#FFF1E6;color:#B44A00;font-weight:600}.tf-live i{width:8px;height:8px;border-radius:50%;background:#F76808;animation:tfPulse 1.6s infinite}.tf-last{color:#1F4FB8;font-weight:600}.tf-body{display:flex;gap:20px;flex:1;min-height:0}.tf-left{flex:0 0 57%;display:flex;flex-direction:column;gap:10px;min-width:0}.tf-grid{display:grid;grid-template-columns:64px 58px 18px minmax(0,1fr) 18px minmax(0,1fr) 18px minmax(0,1fr) 18px 150px;column-gap:4px;align-items:center}.tf-colhead{padding:0 9px;font-size:11px;color:#4B5563;font-weight:600}.tf-colhead span{text-align:center}.tf-colhead span:first-child{text-align:left}.tf-box{position:relative;display:flex;flex-direction:column;gap:6px;padding:11px 8px 7px;border-radius:10px}.tf-box.tet{border:1px solid #DCE6F7;background:#F8FAFF}.tf-box.fal{border:1px solid #F7D4D5;background:#FFF8F8}.tf-tag{position:absolute;top:-8px;left:10px;padding:0 6px;background:#FFFFFF;font-size:10px;font-weight:700}.tet .tf-tag{color:#1E3A8A}.fal .tf-tag{color:#9B1C1F}.tf-name{font-size:14px;font-weight:700;white-space:nowrap}.fal .tf-name{font-size:13px}.tf-inc{text-align:center;font-size:18px;font-weight:700;border:1px solid #D1D5DB;border-radius:8px;padding:5px 0;background:#FFFFFF}.tf-cell{display:flex;align-items:baseline;justify-content:center;gap:6px;border-radius:8px;padding:6px 8px;min-width:0}.tf-cell b{font-size:18px}.tf-cell small{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tf-cell.lv1{background:#DCE8FD;color:#1E3A8A}.tf-cell.lv2{background:#A9C7F9;color:#0F2A6B}.tf-cell.lv3{background:#2F64D6;color:#FFFFFF}.tf-cell.zero,.tf-cell.none{background:#F3F4F6;color:#4B5563}.tf-cell.recent{outline:2px solid #F76808;animation:tfPulse 1.6s infinite}.tf-arrow{position:relative;height:12px}.tf-arrow::before{content:'';position:absolute;left:0;right:5px;top:5px;height:2px;background:#D1D5DB}.tf-arrow::after{content:'';position:absolute;right:2px;top:2px;width:6px;height:6px;border-top:2px solid #D1D5DB;border-right:2px solid #D1D5DB;transform:rotate(45deg)}.tf-arrow.on::before{background:#9CA3AF linear-gradient(90deg,transparent,#2F64D6,transparent) no-repeat;background-size:6px 100%;animation:tfGlow 2.6s ease-in-out infinite}.tf-arrow.on::after{border-color:#9CA3AF}.tf-wall{justify-self:center;width:11px;height:11px;margin-right:5px;border-top:3.5px solid #0E2C6E;border-right:3.5px solid #0E2C6E;transform:rotate(45deg)}.tf-result{display:flex;align-items:center;justify-content:space-between;background:#9EDB8F;color:#0E3B1A;border:1px solid #5DB55A;border-radius:8px;padding:6px 10px;font-size:12px}.tf-result b{font-size:15px}.tf-result small{color:#24562A;font-size:12px}.tf-falrow{display:grid;grid-template-columns:64px 58px minmax(0,1fr) 150px;column-gap:4px;align-items:center}.tf-dash{display:flex;align-items:center;gap:10px;color:#6B7280;font-size:12px;margin-left:22px}.tf-dash i{flex:1;height:2px;background:repeating-linear-gradient(90deg,#F3A5A8 0 6px,transparent 6px 12px);animation:tfDash 3s linear infinite}.tf-unblocked{display:flex;align-items:center;justify-content:center;background:#E5484D;color:#FFFFFF;border-radius:8px;padding:7px 10px;font-size:15px;font-weight:700}.tf-unblocked.zero{background:#F3F4F6;color:#4B5563}.tf-feed{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;border-left:1px solid #E5E7EB;padding-left:20px}.tf-feedhead{display:flex;justify-content:space-between;font-size:11px;color:#4B5563;font-weight:600}.tf-feedhead a{color:#1F60C4}.tf-item{display:grid;grid-template-columns:64px 54px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 8px;border-radius:6px;border:1px solid #F3F4F6}.tf-item:hover{border-color:#D1D5DB}.tf-item.new{border-color:#FFD8B8;animation:tfIn .6s ease-out 1,tfNew 2.4s ease-out .6s 1 both}.tf-time{font-size:12px;color:#374151;font-variant-numeric:tabular-nums}.tf-svc{font-size:11px;font-weight:700;color:#1E3A8A;background:#DCE8FD;border-radius:4px;padding:2px 6px;text-align:center}.tf-svc.falco{color:#9B1C1F;background:#FDE2E3}.tf-path{font-size:12px;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tf-path b{color:#1F4FB8}.tf-badge{font-size:11px;font-weight:700;color:#0E3B1A;background:#9EDB8F;border:1px solid #5DB55A;border-radius:999px;padding:2px 8px}.tf-badge.bad{color:#FFFFFF;background:#E5484D;border-color:#E5484D}.tf-empty{font-size:12px;color:#6B7280;padding:8px}@keyframes tfPulse{0%{box-shadow:0 0 0 0 rgba(247,104,8,.55)}70%{box-shadow:0 0 0 8px rgba(247,104,8,0)}100%{box-shadow:0 0 0 0 rgba(247,104,8,0)}}@keyframes tfGlow{0%{background-position:-6px 0}100%{background-position:14px 0}}@keyframes tfDash{to{background-position:24px 0}}@keyframes tfIn{0%{transform:translateY(-8px);opacity:0}100%{transform:none;opacity:1}}@keyframes tfNew{0%{background:#FFF1E6}100%{background:#FFFFFF}}"
 
 
 def flow_panel(b, y):
-    els = []
-    top0, row_h, gap = 14, 15, 3
-    grey = "#6B7280"
-    els.append(_el("h-runtime", "text", 0, 0, 8, 12, _txt("런타임", 12, grey)))
-    els.append(_el("h-incidents", "text", 9, 0, 10, 12, _txt("사건", 12, grey)))
-    for key, title, left in FLOW_COLS:
-        els.append(_el(f"h-{key}", "text", left, 0, 13, 12, _txt(title, 12, grey)))
-    els.append(_el("h-result", "text", 74, 0, 25, 12, _txt("결과 (차단 / 미차단)", 12, grey)))
-    els.append(_el("last-block", "text", 0, 88, 99, 11, _txt("", 12, "#3871DC", field="last_block_text", align="right")))
-    rows = [*FLOW_ROWS, ("falco", "Falco만")]
-    for i, (k, label) in enumerate(rows):
-        t = top0 + i * (row_h + gap) + (7 if k in ("node", "falco") else 0)  # Java 아래 egress 줄 자리
-        els.append(_el(f"{k}-label", "text", 0, t, 8, row_h, _txt(label, 15, align="left")))
-        els.append(_cell(f"{k}-incidents", 9, t, 10, row_h, f"{k}_incidents", recent_field=f"{k}_recent"))
-        if k == "falco":
-            els.append(_el("falco-bar", "text", 19, t, 55, row_h,
-                           _txt("──────────  커널 차단 없이 탐지만  ──────────▶", 12, grey)))
-        else:
-            for key, _, left in FLOW_COLS:
-                els.append(_el(f"{k}-arrow-{key}", "text", left - 4, t, 4, row_h, _txt("─▶", 14, "#9CA3AF")))
-                els.append(_cell(f"{k}-{key}", left, t, 13, row_h * 0.62, f"{k}_{key}",
-                                 text_field=f"{k}_{key}_text", recent_field=f"{k}_{key}_recent"))
-                els.append(_el(f"{k}-{key}-policy", "text", left, t + row_h * 0.62, 13, row_h * 0.38,
-                               _txt("", 10, "#4B5563", field=f"{k}_{key}_policy")))
-            els.append(_el(f"{k}-arrow-result", "text", 70, t, 4, row_h, _txt("─▶", 14, "#9CA3AF")))
-            els.append(_cell(f"{k}-blocked", 74, t, 12, row_h, f"{k}_blocked", text_field=f"{k}_blocked_text", size=15))
-        els.append(_cell(f"{k}-unblocked", 87, t, 12, row_h, f"{k}_unblocked", text_field=f"{k}_unblocked_text",
-                         size=15))
-        if k == "java":  # egress 차단은 Java 줄 아래 작은 칸
-            et = t + row_h + 1
-            els.append(_el("java-egress-arrow", "text", 36, et, 4, 6, _txt("└▶", 12, "#9CA3AF")))
-            els.append(_cell("java-egress", 40, et, 13, 6, "java_egress", text_field="java_egress_text", size=11))
-            els.append(_el("java-egress-label", "text", 54, et, 16, 6, _txt("egress 차단 (Java)", 10, grey, align="left")))
-
-    fields, overrides = [], []
-    url = "/d/" + UIDS["overview"] + "?${__url_time_range}"
-
-    def num(name, kind, links=None):
-        color = {"layer": BLUE, "blocked": BLUE, "unblocked": RED, "incidents": "#A5C8F5"}[kind]
-        props = [{"id": "color", "value": {"mode": "thresholds"}},
-                 {"id": "thresholds", "value": thresholds((None, FLOW_GREY), (1, color))},
-                 {"id": "mappings", "value": [{"type": "special", "options": {
-                     "match": "null", "result": {"color": FLOW_GREY, "index": 0}}}]}]
-        if links:
-            props.append({"id": "links", "value": links})
-        fields.append((name, name, "number"))
-        overrides.append({"matcher": {"id": "byName", "options": name}, "properties": props})
-
-    def recent(name):
-        fields.append((name, name, "number"))
-        overrides.append({"matcher": {"id": "byName", "options": name}, "properties": [
-            {"id": "color", "value": {"mode": "thresholds"}},
-            {"id": "thresholds", "value": thresholds((None, "transparent"), (1, FLOW_RECENT))}]})
-
-    for k, label in [*FLOW_ROWS, ("falco", None)]:
-        rt = f"&var-runtime={label}" if label else ""
-        go = [{"title": f"운영 현황 · {label or 'Falco만 (미차단)'}",
-               "url": url + (rt if label else "&var-status=unblocked")}]
-        num(f"{k}_incidents", "incidents", go)
-        recent(f"{k}_recent")
-        if label:
-            for key, _, _ in FLOW_COLS:
-                num(f"{k}_{key}", "layer", go)
-                recent(f"{k}_{key}_recent")
-                fields.extend([(f"{k}_{key}_text", f"{k}_{key}_text", "string"),
-                               (f"{k}_{key}_policy", f"{k}_{key}_policy", "string")])
-            num(f"{k}_blocked", "blocked", [{"title": f"{label} 차단 사건", "url": url + rt + "&var-status=blocked"}])
-            fields.append((f"{k}_blocked_text", f"{k}_blocked_text", "string"))
-        num(f"{k}_unblocked", "unblocked", [{"title": "미차단 사건", "url": url + rt + "&var-status=unblocked"}])
-        fields.append((f"{k}_unblocked_text", f"{k}_unblocked_text", "string"))
-    num("java_egress", "layer")
-    fields.extend([("java_egress_text", "java_egress_text", "string"), ("last_block_text", "last_block_text", "string")])
-
-    target = inf("/flow/summary?" + TR + "&namespace=${namespace}", fields)
-    target["root_selector"] = "flat"
-    return b.add("canvas", "계층별 방어 흐름 · 사건 기준", 0, y, 24, 9, [target], DS_B,
-                 {"inlineEditing": False, "showAdvancedTypes": True, "panZoom": False, "infinitePan": False,
-                  "tooltip": {"mode": "details", "disableForOneClick": False},
-                  "root": {"type": "frame", "name": "root", "elements": els,
-                           "background": {"color": {"fixed": "transparent"}},
-                           "border": {"color": {"fixed": "transparent"}},
-                           "constraint": {"horizontal": "left", "vertical": "top"}, "placement": {}}},
-                 # 빈 정책 이름 칸에 '0'이 찍히지 않게 값 없음 표시는 공백으로 둔다(숫자 칸은 0이 그대로 온다)
-                 defaults={"noValue": " ", "color": {"mode": "thresholds"}, "thresholds": thresholds((None, FLOW_GREY))},
-                 overrides=overrides,
-                 desc="공격이 앱(uprobe) → 프로세스(kprobe) → 커널(LSM) 순서로 여러 겹 감시되고 어디서 막혔는지 보여 줍니다. "
-                      "칸 숫자 = 그 계층에 걸린 사건 수(/flow/summary). 주황 테두리 = 최근 5분 안에 시작한 사건. "
-                      "'해당 없음' = 그 런타임 pod에 그 계층 정책이 없음. 칸을 누르면 운영 현황이 그 런타임·상태로 걸러집니다.")
+    target = inf("/flow/summary?" + TR + "&namespace=${namespace}", [("html", "html", "string")])
+    p = b.add("marcusolsson-dynamictext-panel", "", 0, y, 24, 9, [target], DS_B,
+              {"renderMode": "everyRow", "content": "{{{html}}}", "defaultContent": "계층별 방어 흐름을 불러오는 중…",
+               "editors": ["styles"], "contentPartials": [], "helpers": "", "styles": FLOW_CSS,
+               "wrap": False, "editor": {"language": "html", "format": "auto"}},
+              desc="계층별 방어 흐름 · 사건 기준. 앱(uprobe) → 프로세스(kprobe) → 커널(LSM)에서 막혔는지, "
+                   "Falco로만 탐지된 사건은 따로 보여 줍니다. 주황 테두리·LIVE = 최근 5분 활동. "
+                   "줄을 누르면 운영 현황이 그 서비스로, 피드를 누르면 사건 상세로 갑니다.")
+    p["transparent"] = True
+    return p
 
 
 # =====================================================================

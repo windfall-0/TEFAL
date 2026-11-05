@@ -98,6 +98,7 @@ kube-prometheus-stack의 sidecar를 쓰면 대시보드 ConfigMap에 `grafana_da
 - 상단 링크(운영 현황 · 사건 상세 · 위협 인텔리전스 · 인프라 · Hubble UI ↗ · Headlamp ↗)가 탭 역할을 한다.
 - 사건 큐의 **단계**는 Sigma level(Critical · High · Medium · Low · Info)이다. 상단 필터 `단계`로 거를 수 있다. 매칭 기준은 `BACKEND_API.md` 4.8.
 - 사건 큐의 **상태**는 차단됨 · 미차단 · 판정 중이다. 판정 중은 Falco 경보 뒤 Tetragon 결과를 기다리는 사건이다.
+- ① 맨 위 **계층별 방어 흐름**: 서비스 줄을 누르면 그 서비스로, Falco 탐지 줄은 미차단으로 걸러지고, 오른쪽 최근 공격을 누르면 사건 상세로 간다.
 - ① 상단 숫자를 누르면 관련 패널이 크게 열린다(필터·시간 범위 유지).
   - 미차단 → 사건 큐(상태 = 미차단)
   - 차단 → 시간대별 사건 그래프
