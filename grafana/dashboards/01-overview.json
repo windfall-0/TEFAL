@@ -1629,7 +1629,7 @@
       "id": 10,
       "type": "marcusolsson-dynamictext-panel",
       "title": "",
-      "description": "계층별 방어 흐름 · 사건 기준. 앱(uprobe) → 프로세스(kprobe) → 커널(LSM)에서 막혔는지, Falco로만 탐지된 사건은 따로 보여 줍니다. 주황 테두리·LIVE = 최근 5분 활동. 줄을 누르면 운영 현황이 그 서비스로, 피드를 누르면 사건 상세로 갑니다.",
+      "description": "계층별 방어 흐름 · 사건 기준. 앱(uprobe) → 프로세스(kprobe) → 커널(LSM)에서 막혔는지, Falco로만 탐지된 사건은 따로 보여 줍니다. 주황 테두리 = 최근 5분 활동. 줄을 누르면 운영 현황이 그 서비스로, 피드를 누르면 사건 상세로 갑니다.",
       "gridPos": {
         "x": 0,
         "y": 0,

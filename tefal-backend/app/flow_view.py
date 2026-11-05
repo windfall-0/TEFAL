@@ -96,13 +96,12 @@ def _feed_item(inc, tz: str, first: bool) -> str:
             f'<span class="tf-badge{"" if blocked else " bad"}">{"차단" if blocked else "미차단"}</span></a>')
 
 
-def render(rows: list[dict], feed: list, last_block_text: str, rng: str, tr: dict, tz: str, live: bool,
+def render(rows: list[dict], feed: list, last_block_text: str, rng: str, tr: dict, tz: str,
            now_ms: int = 0) -> str:
     tet = [r for r in rows if r["runtime"] in flow.RUNTIMES]
     fal = next((r for r in rows if r["runtime"] == flow.FALCO_ONLY), None)
     head = ('<div class="tf-head"><div class="tf-title"><b>계층별 방어 흐름</b>'
             f"<span>사건 기준 · {escape(rng)}</span></div><div class=\"tf-meta\">"
-            + ('<span class="tf-live"><i></i>LIVE</span>' if live else "")
             + f'<span class="tf-last">{escape(last_block_text)}</span></div></div>')
     colhead = ('<div class="tf-grid tf-colhead"><span>서비스</span><span>사건</span><span></span>'
                "<span>앱 탐지 · uprobe</span><span></span><span>프로세스 · kprobe</span><span></span>"

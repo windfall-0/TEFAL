@@ -143,10 +143,9 @@ async def summary(request: Request, f: Annotated[CommonFilters, Depends(common_f
         fl = flat(rows, last, now_ms)
         tz = request.app.state.settings.display_tz
         feed = sorted(incs, key=lambda i: i.start_ms, reverse=True)
-        live = any(now_ms - i.start_ms <= RECENT_MS for i in incs)
         html = flow_view.render(rows, feed, fl["last_block_text"],
                                 flow_view.range_text(f.from_ms, f.to_ms, now_ms, tz),
-                                flow_view.link_range(f.from_ms, f.to_ms, now_ms), tz, live, now_ms)
+                                flow_view.link_range(f.from_ms, f.to_ms, now_ms), tz, now_ms)
         return {"rows": rows, "last_block_ms": last, "flat": fl, "html": html}
 
     key = f"flow:{f.namespace}:{f.from_ms // 30000}:{f.to_ms // 30000}"

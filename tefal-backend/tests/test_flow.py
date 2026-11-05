@@ -100,7 +100,7 @@ def test_flow_view_range_and_escape():
     assert " ~ " in flow_view.range_text(now - 7200000, now - 3600000, now, "Asia/Seoul")
     row = {"runtime": "PHP", "incidents": 1, "app": 1, "proc": None, "lsm": 0, "blocked": 1, "unblocked": 0,
            "policy": {"app": "<img src=x onerror=1>"}, "recent": {"app": 1}}
-    html = flow_view.render([row], [], "x", "최근 1일", {"from": 0, "to": 1}, "Asia/Seoul", False)
+    html = flow_view.render([row], [], "x", "최근 1일", {"from": 0, "to": 1}, "Asia/Seoul")
     assert "<img" not in html and "&lt;img" in html and "tf-cell lv1 recent" in html
     assert "해당 없음" in html and "tf-cell zero" in html and "tf-live" not in html
 

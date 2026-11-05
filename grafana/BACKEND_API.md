@@ -297,7 +297,7 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
 - `flat`: Canvas 패널용 한 줄 데이터(`<php|java|node|falco>_<칸>`, `_text`, `_recent`, `_policy`).
 - `html`: ① 패널(Business Text)이 그대로 넣는 화면(`app/flow_view.py`). 목업(저장소 밖 `mockups/flow`, 2026-11-05 확정)을 따른다.
   - 왼쪽: Tetragon 영역(서비스 × 앱 → 프로세스 → 커널 차단 → `>` → 결과)과 Falco 탐지 영역. 오른쪽: 시간 범위 안 최근 사건 5건(경로: 정책 짧은 이름 → … → LSM 차단 / 강제 종료).
-  - 제목 옆 범위는 대시보드 시간 범위(`최근 1일`, `MM/DD HH:MM ~ …`). `마지막 차단`(최근 7일)과 LIVE·주황 테두리(최근 5분)는 지금 시각 기준.
+  - 제목 옆 범위는 대시보드 시간 범위(`최근 1일`, `MM/DD HH:MM ~ …`). `마지막 차단`(최근 7일)과 주황 테두리(최근 5분)는 지금 시각 기준.
   - 링크: 서비스 줄 → 운영 현황 `var-runtime`, Falco 탐지 → `var-status=unblocked`, 피드 → 사건 상세(사건 ±5분). 지금까지 보는 중이면 상대 범위(`now-1d`)로 넘긴다.
   - 데이터의 정책·룰 이름은 이스케이프한다. 스타일·애니메이션(CSS)은 대시보드 패널 옵션(`FLOW_CSS`)에 있다.
 - **지난 사건은 사건 DB를 다시 만들지 않고 채웠다**(2026-11-05). 기동 시 한 번, `layers`가 빈 사건마다 묶인 이벤트를 Loki에서 다시 읽어 계층을 계산한다(`events.backfill_layers`, state `layers_backfill_v1`). 재생성하면 웹훅으로만 받은 Falco 사건이 사라지기 때문이다. span이 바뀌지 않으므로 `TRACE_ID_VERSION`은 5 그대로다.

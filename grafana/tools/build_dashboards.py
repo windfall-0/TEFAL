@@ -227,7 +227,7 @@ def flow_panel(b, y):
                "editors": ["styles"], "contentPartials": [], "helpers": "", "styles": FLOW_CSS,
                "wrap": False, "editor": {"language": "html", "format": "auto"}},
               desc="계층별 방어 흐름 · 사건 기준. 앱(uprobe) → 프로세스(kprobe) → 커널(LSM)에서 막혔는지, "
-                   "Falco로만 탐지된 사건은 따로 보여 줍니다. 주황 테두리·LIVE = 최근 5분 활동. "
+                   "Falco로만 탐지된 사건은 따로 보여 줍니다. 주황 테두리 = 최근 5분 활동. "
                    "줄을 누르면 운영 현황이 그 서비스로, 피드를 누르면 사건 상세로 갑니다.")
     return p
 
