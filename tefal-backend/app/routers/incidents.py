@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from app.core.demo import demo_ip
 from app.core.errors import ApiError
 from app.core.params import ALLOWED_LEVELS, CommonFilters, common_filters
-from app.core.timefmt import fmt_hm, fmt_hms
+from app.core.timefmt import fmt_hm, fmt_hms, fmt_md
 from app.core.validators import is_valid_k8s_name, validate_trace_id
 from app.incidents.store import Incident, IncidentStore
 
@@ -179,6 +179,27 @@ async def timeseries(request: Request, f: Filters, interval: str = "5m") -> list
         if 0 <= k < n:
             buckets[k]["unblocked" if _is_unblocked(i.status) else "blocked"] += 1
     return buckets
+
+
+@router.get("/incidents/recent")
+async def recent(request: Request, limit: Annotated[int, Query(ge=1, le=200)] = 50) -> list[dict]:
+    """② 사건 선택 목록: 시간 범위와 상관없이 최신순. 맨 위가 가장 최근 사건(기본 선택).
+
+    `option_text`는 드롭다운 표시용("10:55:28 · php2shell · 행위 요약"), `trace_id`는 값.
+    """
+    s = request.app.state.settings
+    now = int(time.time() * 1000)
+    incs = await _store(request).query(CommonFilters(0, now, None, None, None))
+    incs = sorted(incs, key=lambda i: i.start_ms, reverse=True)[:limit]
+    out = []
+    for i in incs:
+        m = to_model(i, s.display_tz, s.demo_src_ip_list)
+        day = fmt_md(i.start_ms, s.display_tz)
+        workload = re.sub(r"(-[a-z0-9]{8,10})?-[a-z0-9]{5}$", "", i.pod)
+        out.append({"trace_id": i.trace_id, "start_ms": i.start_ms,
+                    "option_text": f"{day} {fmt_hms(i.start_ms, s.display_tz)} · {workload} · {i.summary[:40]}",
+                    "window_from_ms": m["window_from_ms"], "window_to_ms": m["window_to_ms"]})
+    return out
 
 
 @router.get("/incidents/{trace_id}")

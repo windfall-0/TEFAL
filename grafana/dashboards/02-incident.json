@@ -40,9 +40,9 @@
     {
       "title": "사건 상세",
       "type": "link",
-      "url": "/d/tefal-incident",
+      "url": "/d/tefal-incident?from=now-24h&to=now",
       "icon": "dashboard",
-      "keepTime": true,
+      "keepTime": false,
       "includeVars": false,
       "targetBlank": false,
       "asDropdown": false,
@@ -101,16 +101,51 @@
   "templating": {
     "list": [
       {
-        "type": "textbox",
+        "type": "query",
         "name": "trace_id",
-        "label": "incident (trace_id)",
+        "label": "사건",
         "hide": 0,
-        "query": "",
-        "current": {
-          "text": "",
-          "value": ""
+        "datasource": {
+          "type": "yesoreyeram-infinity-datasource",
+          "uid": "tefal-backend"
         },
-        "options": []
+        "query": {
+          "queryType": "infinity",
+          "query": "",
+          "refId": "var-trace_id",
+          "infinityQuery": {
+            "type": "json",
+            "source": "url",
+            "parser": "backend",
+            "format": "table",
+            "url": "/incidents/recent?limit=50",
+            "url_options": {
+              "method": "GET",
+              "data": ""
+            },
+            "root_selector": "",
+            "columns": [
+              {
+                "selector": "option_text",
+                "text": "__text",
+                "type": "string"
+              },
+              {
+                "selector": "trace_id",
+                "text": "__value",
+                "type": "string"
+              }
+            ],
+            "filters": []
+          }
+        },
+        "refresh": 1,
+        "sort": 0,
+        "options": [],
+        "current": {},
+        "includeAll": false,
+        "multi": false,
+        "allowCustomValue": true
       },
       {
         "type": "textbox",
@@ -348,6 +383,16 @@
               "selector": "src_ip_text",
               "text": "출발지 IP",
               "type": "string"
+            },
+            {
+              "selector": "window_from_ms",
+              "text": "window_from_ms",
+              "type": "number"
+            },
+            {
+              "selector": "window_to_ms",
+              "text": "window_to_ms",
+              "type": "number"
             }
           ],
           "filters": []
@@ -359,7 +404,7 @@
           "calcs": [
             "lastNotNull"
           ],
-          "fields": "/.*/"
+          "fields": "/^(상태|워크로드|런타임|시작|MITRE|출발지 IP)$/"
         },
         "textMode": "value_and_name",
         "colorMode": "none",
@@ -375,11 +420,21 @@
       },
       "fieldConfig": {
         "defaults": {
-          "noValue": "trace_id를 입력하세요"
+          "noValue": "사건을 선택하세요",
+          "links": [
+            {
+              "title": "이 사건 시각으로 맞추기 (±5분)",
+              "url": "/d/tefal-incident?var-trace_id=${trace_id}&from=${__data.fields.window_from_ms}&to=${__data.fields.window_to_ms}"
+            }
+          ]
         },
         "overrides": []
       },
       "links": [
+        {
+          "title": "이 사건 시각으로 맞추기 (±5분)",
+          "url": "/d/tefal-incident?var-trace_id=${trace_id}&from=${__data.fields.window_from_ms}&to=${__data.fields.window_to_ms}"
+        },
         {
           "title": "← 사건 큐",
           "url": "/d/tefal-overview?from=now-1h&to=now"

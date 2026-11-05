@@ -220,6 +220,13 @@ Falco ─→ Falcosidekick ─(webhook)────────┼→ tefal-back
 - 다른 `/incidents/*` 집계 API도 같은 필터(`namespace`, `runtime`, `status`, `level`)를 받는다.
 - 응답: 사건 모델 배열
 
+#### `GET /incidents/recent`
+② 사건 선택 드롭다운. 시간 범위와 상관없이 최신순 `limit`(기본 50)건.
+```json
+[{ "trace_id": "…", "start_ms": 1793843209239, "option_text": "11/05 11:06:49 · php2shell · /usr/sbin/apache2 -DFOREGROUND (강제 종료)",
+   "window_from_ms": 1793842909239, "window_to_ms": 1793843509239 }]
+```
+
 #### `GET /incidents/summary`
 상단 Stat 카드 3개와 경고 단계별 건수.
 ```json

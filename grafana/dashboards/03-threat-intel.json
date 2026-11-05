@@ -40,9 +40,9 @@
     {
       "title": "사건 상세",
       "type": "link",
-      "url": "/d/tefal-incident",
+      "url": "/d/tefal-incident?from=now-24h&to=now",
       "icon": "dashboard",
-      "keepTime": true,
+      "keepTime": false,
       "includeVars": false,
       "targetBlank": false,
       "asDropdown": false,

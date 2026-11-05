@@ -108,8 +108,10 @@ def nav_links():
     links = []
     for title, key in [("운영 현황", "overview"), ("사건 상세", "incident"),
                        ("위협 인텔리전스", "ti"), ("인프라", "infra")]:
-        links.append({"title": title, "type": "link", "url": "/d/" + UIDS[key],
-                      "icon": "dashboard", "keepTime": True, "includeVars": False,
+        incident = key == "incident"  # 사건 상세는 최근 24시간으로 열고, 드롭다운이 가장 최근 사건을 고른다
+        links.append({"title": title, "type": "link",
+                      "url": "/d/" + UIDS[key] + ("?from=now-24h&to=now" if incident else ""),
+                      "icon": "dashboard", "keepTime": not incident, "includeVars": False,
                       "targetBlank": False, "asDropdown": False, "tags": [], "tooltip": ""})
     for title, var in [("Hubble UI", "hubble_url"), ("Headlamp", "headlamp_url")]:
         links.append({"title": title, "type": "link", "url": "${" + var + "}",
@@ -137,6 +139,17 @@ def custom(name, label, query, multi=False, include_all=True, default_all=True):
         v["current"] = {"text": ["All"] if multi else "All",
                         "value": ["$__all"] if multi else "$__all"}
     return v
+
+
+def incident_picker():
+    """② 사건 선택. 최근 사건 목록(/incidents/recent, 최신순)에서 고르고, 주소에 값이 없으면 맨 위를 고른다.
+    사건 큐에서 넘어온 trace_id가 목록(최근 50건)에 없어도 유지되도록 사용자 값을 허용한다."""
+    q = inf("/incidents/recent?limit=50", [("option_text", "__text", "string"), ("trace_id", "__value", "string")])
+    q.pop("refId"); q.pop("datasource")
+    return {"type": "query", "name": "trace_id", "label": "사건", "hide": 0, "datasource": DS_B,
+            "query": {"queryType": "infinity", "query": "", "refId": "var-trace_id", "infinityQuery": q},
+            "refresh": 1, "sort": 0, "options": [], "current": {}, "includeAll": False, "multi": False,
+            "allowCustomValue": True}
 
 
 def inf_var(name, url, selector):
@@ -367,14 +380,20 @@ def overview():
 # =====================================================================
 def incident():
     b = Builder()
+    # 드롭다운으로 사건을 바꾸면 대시보드 시간 범위는 그대로라, 사건 시각 ±5분으로 다시 여는 링크를 둔다
+    fit_time = {"title": "이 사건 시각으로 맞추기 (±5분)",
+                "url": "/d/" + UIDS["incident"] + "?var-trace_id=${trace_id}"
+                       "&from=${__data.fields.window_from_ms}&to=${__data.fields.window_to_ms}"}
     b.add("stat", "사건 요약", 0, 0, 24, 4,
           [inf("/incidents/${trace_id}",
                [("status_text", "상태", "string"), ("workload", "워크로드", "string"),
                 ("runtime_detail", "런타임", "string"), ("time_text", "시작", "string"),
-                ("mitre_text", "MITRE", "string"), ("src_ip_text", "출발지 IP", "string")])],
-          DS_B, {**stat_opts(fields="/.*/", size=(12, 18), color="none"), "colorMode": "none"},
-          defaults={"noValue": "trace_id를 입력하세요"},
-          links=[{"title": "← 사건 큐", "url": "/d/" + UIDS["overview"] + "?from=now-1h&to=now"}])
+                ("mitre_text", "MITRE", "string"), ("src_ip_text", "출발지 IP", "string"),
+                ("window_from_ms", "window_from_ms", "number"), ("window_to_ms", "window_to_ms", "number")])],
+          DS_B, {**stat_opts(fields="/^(상태|워크로드|런타임|시작|MITRE|출발지 IP)$/", size=(12, 18), color="none"),
+                 "colorMode": "none"},
+          defaults={"noValue": "사건을 선택하세요", "links": [fit_time]},
+          links=[fit_time, {"title": "← 사건 큐", "url": "/d/" + UIDS["overview"] + "?from=now-1h&to=now"}])
 
     tv = b.add("traces", "Trace View · 계층별 인과 흐름", 0, 4, 15, 15,
                # Grafana 화면의 Tempo 데이터소스는 queryType "traceId"를 실행하지 않는다(패널이 계속 로딩).
@@ -447,7 +466,7 @@ def incident():
                   "url": "/d/" + UIDS["ti"] + "?var-ip=${src_ip}&from=now-24h&to=now"}])
 
     variables = [
-        textbox("trace_id", "incident (trace_id)"),
+        incident_picker(),
         textbox("ai_req", "AI 요청") | {"hide": 2},  # 버튼이 주소에 붙이는 값. 평소엔 비어 있다
         inf_var("src_ip", "/incidents/${trace_id}", "src_ip"),
         inf_var("exec_id", "/incidents/${trace_id}", "exec_id"),

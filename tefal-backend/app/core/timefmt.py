@@ -19,6 +19,10 @@ def fmt_hms(epoch_ms: int, tz: str) -> str:
     return datetime.fromtimestamp(epoch_ms / 1000, _tz(tz)).strftime("%H:%M:%S")
 
 
+def fmt_md(epoch_ms: int, tz: str) -> str:
+    return datetime.fromtimestamp(epoch_ms / 1000, _tz(tz)).strftime("%m/%d")
+
+
 def fmt_hm(epoch_ms: int, tz: str) -> str:
     return datetime.fromtimestamp(epoch_ms / 1000, _tz(tz)).strftime("%H:%M")
 

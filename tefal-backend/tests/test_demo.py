@@ -105,3 +105,21 @@ def test_src_ip_text_reasons():
     assert src_ip_text(inc(beyla_trace_id="b" * 32), None) == "확인 불가"
     assert src_ip_text(inc(src_ip="10.233.66.37"), "162.142.125.10") == "162.142.125.10 · 시연용"
     assert src_ip_text(inc(src_ip="8.8.8.8"), "8.8.8.8") == "8.8.8.8"
+
+
+def test_incidents_recent_list(tmp_path):
+    from fastapi.testclient import TestClient
+
+    from app.config import Settings
+    from app.main import create_app
+    from tests.test_incidents import NS, T0, _run, attack_lines
+
+    s = Settings(tefal_api_token=TOKEN, cache_db=f"sqlite:///{tmp_path / 't.db'}", collector_enabled=False,
+                 watch_namespaces="vuln-lab", k8s_enabled=False, hubble_enabled=False,
+                 sigma_levels_file=str(tmp_path / "s.yaml"), _env_file=None)
+    app = create_app(s)
+    with TestClient(app) as c:
+        c.portal.call(lambda: _run(s, app.state.incidents, attack_lines(), now_ns=T0 + 60 * NS))
+        rows = c.get("/incidents/recent", headers={"Authorization": f"Bearer {TOKEN}"}).json()
+        assert len(rows) == 1 and len(rows[0]["trace_id"]) == 32
+        assert " · php2shell · " in rows[0]["option_text"] and rows[0]["window_from_ms"] < rows[0]["start_ms"]
