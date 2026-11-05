@@ -36,6 +36,17 @@ def _is_unblocked(status: str) -> bool:
     return status != "blocked"
 
 
+def src_ip_text(inc: Incident, shown: str | None) -> str:
+    """출발지 IP 표시. 없으면 이유: Falco 경보만으로 만든 사건이거나, 연결된 HTTP 요청(Beyla)이 없다."""
+    if shown:
+        return f"{shown} · 시연용" if shown != inc.src_ip else shown
+    if inc.detected_by == "falco":
+        return "확인 불가 (Falco 단독 경보)"
+    if not inc.beyla_trace_id:
+        return "확인 불가 (HTTP 요청 연결 없음)"
+    return "확인 불가"
+
+
 def to_model(inc: Incident, tz: str, demo_pool: list[str] | None = None) -> dict:
     ms = inc.anchor_ms
     src_ip = demo_ip(inc.src_ip, demo_pool or [], inc.trace_id)
@@ -62,8 +73,8 @@ def to_model(inc: Incident, tz: str, demo_pool: list[str] | None = None) -> dict
         "src_ip": src_ip,
         "src_ip_original": inc.src_ip,
         "src_ip_demo": src_ip != inc.src_ip,
-        # 화면 표시용: 시연 IP는 실제 출발지가 아니라는 표시를 붙인다
-        "src_ip_text": f"{src_ip} · 시연용" if src_ip != inc.src_ip else src_ip,
+        # 화면 표시용: 시연 IP는 실제 출발지가 아니라는 표시를, 없으면 이유를 붙인다
+        "src_ip_text": src_ip_text(inc, src_ip),
         "exec_id": inc.exec_id,
         "parent_exec_id": inc.parent_exec_id,
         "policy": inc.policy,

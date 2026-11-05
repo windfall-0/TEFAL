@@ -57,7 +57,8 @@ async def lifespan(app: FastAPI):
         if settings.gemini_api_key and settings.gemini_model
         else None
     )
-    app.state.ai = AiService(settings, app.state.cache, app.state.incidents, loki, gemini, app.state.ti)
+    app.state.ai = AiService(settings, app.state.cache, app.state.incidents, loki, gemini, app.state.ti,
+                             app.state.sigma_levels)
     task = None
     if settings.collector_enabled:
         collector = Collector(

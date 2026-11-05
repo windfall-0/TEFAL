@@ -313,8 +313,14 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
 ### 5.3 AI 해석 (② AI 해석 · 대응 가이드)
 
 #### `GET /ai/analysis/{trace_id}`
-- 캐시가 있으면 바로 준다. 없으면 생성한 뒤 준다(동기 방식, 타임아웃 30초).
-- `?refresh=true`이면 캐시를 무시하고 다시 생성한다. "다시 분석" 링크가 이 주소를 쓴다.
+**사람이 요청할 때만 Gemini를 부른다** (2026-11-05). 화면을 열면 저장된 결과만 읽는다.
+- `req` 없음: 저장된 분석이 있으면 주고, 없으면 `{"analyzed": false, "markdown": ""}`. Gemini를 부르지 않는다.
+- `req=run:<trace_id>`: 저장된 분석이 없을 때만 만든다(동기 방식, 타임아웃 30초). ② [AI 분석 요청] 버튼이 쓴다.
+- `req=refresh:<trace_id>:<created_ms>`: 저장된 분석이 그 시각 것일 때만 다시 만든다. ② [다시 분석] 버튼이 쓴다. 다시 만든 뒤에는 `created_ms`가 바뀌므로, 주소에 남은 같은 요청으로 새로고침해도 다시 만들지 않는다. 분당 `AI_REFRESH_PER_MIN`회를 넘으면 저장된 결과와 `message`를 준다.
+- `req`의 trace_id가 지금 사건과 다르면 무시한다. 다른 사건으로 바꿨을 때 주소에 남은 요청이 실행되지 않게 하기 위해서다.
+- Gemini를 쓸 수 없거나 호출이 실패하면 오류 대신 `message`에 사유를 담아 200으로 준다. 패널에 요청 버튼이 남는다.
+- 응답에는 버튼 링크용 사건 구간(`window_from_ms`, `window_to_ms`)이 있다. 텍스트 패널은 `${__from}` 같은 Grafana 내장 변수를 바꿔 주지 않기 때문이다.
+- ① 사건 큐의 "트레이스" 버튼은 ② 사건 상세(Trace View + AI 해석)로 간다. Tempo Explore는 Trace View 패널 링크로 연다.
 
 ```json
 {
@@ -338,13 +344,19 @@ Falcosidekick webhook 수신(4.2). Falcosidekick `webhook.address`를 `http://te
 }
 ```
 
-구현 (`app/ai/`, 2026-11-04): Gemini REST `generateContent`(`GEMINI_MODEL`, 기본 배포 `gemini-flash-latest`)에 `responseSchema`를 강제한다.
+구현 (`app/ai/`, 2026-11-04): Gemini REST `generateContent`(`GEMINI_MODEL`, 배포값 `gemini-3.5-flash-lite`)에 `responseSchema`를 강제한다.
 - 응답에 `input_lines`(모델에 넣은 이벤트 줄 수)가 더 있다. `evidence`는 `[{"line": 원문 줄, "why": 이유}]`다.
 - 근거: 모델은 입력 줄 번호(`E1`…)만 고른다. 서버가 그 번호를 실제 입력 줄로 바꾸고, 입력에 없는 번호는 버린다. MITRE ID는 `T####(.###)` 형식만 남긴다. `verdict`·`risk`가 정해진 값이 아니면 `판단 불가`·`중간`.
-- 이벤트는 members 키로 Loki에서 다시 읽고(사건 구간 −65초 ~ +10초, 같은 pod), 1초 안 반복은 `×N`으로 접는다(`dedup.py`).
+- 이벤트는 members 키로 Loki에서 다시 읽고(사건 구간 −65초 ~ +120초, 같은 pod), 1초 안 반복은 `×N`으로 접는다(`dedup.py`).
+  - 끝을 +120초로 잡는 이유: Loki 타임스탬프는 이벤트 시각이 아니라 수집 시각이라 수십 초 늦다. +10초일 때 차단 23번 중 22번이 빠졌다(2026-11-05 확인, 사건 수집기의 이벤트 조회도 같이 고침).
+- **실습 환경 이름 가리기** (`app/ai/mask.py`): `php2shell`·`vuln-lab`·`dvwa` 같은 이름은 모델에게 정답을 알려 주므로, 모델이 실제로 실행된 훅과 행위로 판단하게 한다.
+  - 모델에 보낼 때만 namespace·pod·워크로드·정책 이름·이미지 이름을 `[가림]`으로 바꾼다. 화면 근거 줄은 같은 E 번호의 원래 줄을 보여 준다.
+  - 대상은 런타임만 적는다(예: "PHP 웹 애플리케이션 (PHP 8.5.11)", "Node.js 애플리케이션").
+  - 정책 이름 대신 "훅 종류 + 함수 + 차단/관찰"(예: `LSM 훅 bprm_check_security · 차단`)을 쓴다. `[걸린 훅]` 절에는 훅별 설명(HOOKS)과 Sigma 경고 단계를 붙인다. uprobe 함수는 Tetragon `symbol`에서 읽는다.
+  - 다 만든 프롬프트에 가릴 이름이 남아 있으면 한 번 더 가리고 경고 로그를 남긴다.
 - 오류: 키·모델이 없으면 `503 ai_unavailable`, Gemini 실패(재시도 포함)면 `502 ai_error`. 직전 캐시가 있으면 그 값을 준다. 재시도는 3초 뒤 1회(503 과부하·429 대비).
 - 출발지 IP는 사건 DB 원본을 넣는다(시연 IP를 넣지 않는다). 사설 IP면 "SNAT로 가려졌을 수 있음"을 함께 적는다.
-- 2026-11-04 확인: 키는 유효(모델 목록 조회 성공). `gemini-flash-latest`는 503(과부하) 뒤 429(무료 할당량 초과), `gemini-2.5-flash`는 404(신규 사용자에게 제공 안 함). 모델 결정은 보류 중이다.
+- 모델: `gemini-3.5-flash-lite`(2026-11-05). `gemini-flash-latest`는 503(과부하) 뒤 429(무료 할당량 초과), `gemini-2.5-flash`는 404(신규 사용자에게 제공 안 함)였다. 공식 문서에는 모델별 무료 한도 숫자가 없고 AI Studio Rate Limit 페이지(로그인 필요)에서만 보인다. 무료 등급 목록에 있는 lite 모델을 골랐다. 사건 1건 분석에 약 4초가 걸린다.
 
 **생성 규칙**
 - 입력: 사건 모델 + 사건에 묶인 이벤트(`members`, 최대 50줄) + Falco 경보 + TI 요약
@@ -601,7 +613,7 @@ Hubble Relay `GetFlows`에서 `verdict=DROPPED`이고 출발지나 목적지 pod
 | `GEOIP_CITY_DB` | `/data/GeoLite2-City.mmdb` | |
 | `GEOIP_ASN_DB` | `/data/GeoLite2-ASN.mmdb` | |
 | `GEMINI_API_KEY` | (필수) | |
-| `GEMINI_MODEL` | (설정) | 사용할 Gemini 모델 ID. 배포값 `gemini-flash-latest` |
+| `GEMINI_MODEL` | (설정) | 사용할 Gemini 모델 ID. 배포값 `gemini-3.5-flash-lite` |
 | `TI_CACHE_TTL_HOURS` | `24` | |
 | `AI_CACHE_TTL_DAYS` | `7` | |
 | `AI_REFRESH_PER_MIN` | `5` | |

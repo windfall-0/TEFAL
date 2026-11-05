@@ -15,10 +15,12 @@ import re
 import time
 
 from app.ai.gemini import GeminiClient, GeminiError
+from app.ai.mask import Masker, hook_help, hook_name, runtime_text
 from app.config import Settings
 from app.core.cache import SqliteCache
 from app.core.timefmt import fmt_hms
 from app.incidents import correlate, dedup
+from app.incidents.collector import LOKI_INGEST_LAG_SEC
 from app.incidents.store import Incident, IncidentStore
 from app.incidents.tetragon import TetragonEvent, parse_event
 
@@ -57,52 +59,85 @@ SYSTEM = (
 
 # ---- 입력 만들기 ----
 
-def event_lines(events: list[TetragonEvent], tz: str, gap_ns: int) -> list[str]:
-    """사건 이벤트를 사람이 읽는 한 줄씩으로. 반복은 접고 ×N을 붙인다."""
-    out = []
-    for run in dedup.collapse(events, dedup.tetragon_key, lambda e: e.time_ns, gap_ns):
-        e = run.first
-        p = e.process
-        parts = [fmt_hms(e.time_ns // 1_000_000, tz), e.event_type.removeprefix("process_")]
+def _parts(e: TetragonEvent, run_count: int, tz: str, mask=None) -> str:
+    """이벤트 한 줄. mask가 있으면 모델용: 정책 이름 대신 훅 설명, 이름은 가림."""
+    p = e.process
+    m = mask or (lambda x: x or "")
+    parts = [fmt_hms(e.time_ns // 1_000_000, tz), e.event_type.removeprefix("process_")]
+    if mask is None:
         if e.policy:
             parts.append(f"policy={e.policy}")
         if e.function:
             parts.append(f"fn={e.function}")
         if e.action:
             parts.append(f"action={e.action.removeprefix('KPROBE_ACTION_')}")
-        parts.append(f"binary={p.binary}")
-        if p.arguments:
-            parts.append(f'args="{correlate.redact(p.arguments)[:200]}"')
-        if e.file_arg:
-            parts.append(f"target={correlate.redact(e.file_arg)[:120]}")
-        if e.parent:
-            parts.append(f"parent={os.path.basename(e.parent.binary)}")
-        if run.count > 1:
-            parts.append(f"×{run.count}")
-        out.append(" ".join(parts))
-    if len(out) > MAX_LINES:
+    elif e.policy:  # exec/exit 같은 기본 이벤트에는 훅이 없다
+        parts.append(f"훅={hook_name(e)}")
+    parts.append(f"binary={m(p.binary)}")
+    if p.arguments:
+        parts.append(f'args="{m(correlate.redact(p.arguments))[:200]}"')
+    if e.file_arg:
+        parts.append(f"target={m(correlate.redact(e.file_arg))[:120]}")
+    if e.parent:
+        parts.append(f"parent={m(os.path.basename(e.parent.binary))}")
+    if run_count > 1:
+        parts.append(f"×{run_count}")
+    return " ".join(parts)
+
+
+def event_rows(events: list[TetragonEvent], tz: str, gap_ns: int, masker=None) -> list[dict]:
+    """[{display: 화면용 원래 줄, masked: 모델용 줄, event}]. 반복은 접고 ×N. 최대 MAX_LINES줄."""
+    rows = []
+    for run in dedup.collapse(events, dedup.tetragon_key, lambda e: e.time_ns, gap_ns):
+        e = run.first
+        rows.append({"display": _parts(e, run.count, tz),
+                     "masked": _parts(e, run.count, tz, masker or (lambda x: x or "")),
+                     "event": e})
+    if len(rows) > MAX_LINES:
         # 차단(기준점) 줄은 남기고 앞쪽부터 자른다
-        keep = [x for x in out if "action=OVERRIDE" in x or "action=SIGKILL" in x]
-        rest = [x for x in out if x not in keep][: max(0, MAX_LINES - len(keep))]
-        out = sorted(rest + keep[:MAX_LINES], key=out.index)
-    return out
+        blocked = [r for r in rows if r["event"].is_anchor]
+        rest = [r for r in rows if not r["event"].is_anchor][: max(0, MAX_LINES - len(blocked))]
+        keep = {id(r) for r in rest + blocked[:MAX_LINES]}
+        rows = [r for r in rows if id(r) in keep]
+    return rows
 
 
-def build_prompt(inc: Incident, lines: list[str], ti: dict | None, tz: str) -> str:
+def event_lines(events: list[TetragonEvent], tz: str, gap_ns: int) -> list[str]:
+    """화면용 원래 줄만."""
+    return [r["display"] for r in event_rows(events, tz, gap_ns)]
+
+
+def build_prompt(inc: Incident, rows: list[dict], ti: dict | None, tz: str, masker: Masker, level_of=None) -> str:
+    """모델 입력. 실습 환경 이름(namespace·pod·정책·이미지)은 가리고 훅 설명을 붙인다 (mask.py)."""
+    anchor = next((r["event"] for r in rows if r["event"].is_anchor), None)
     head = [
         f"사건 시각: {fmt_hms(inc.start_ms, tz)} ~ {fmt_hms(inc.last_ms, tz)}",
-        f"워크로드: {inc.namespace}/{inc.pod} (런타임 {inc.runtime_detail or inc.runtime or '알 수 없음'})",
-        f"상태: {inc.status} · 조치 {inc.action} · 기준 정책 {inc.policy or '-'} · 경고 단계 {inc.level}",
-        f"행위 요약: {inc.summary}",
-        f"Falco 룰: {', '.join(inc.falco_rules) or '없음'}",
+        f"대상: 컨테이너로 실행 중인 {runtime_text(inc)}",
+        f"상태: {'차단됨' if inc.status == 'blocked' else inc.status} · 조치 {inc.action}"
+        + (f" · 기준 훅 {hook_name(anchor)}" if anchor else "") + f" · 경고 단계 {inc.level}",
+        f"행위 요약: {masker(inc.summary)}",
+        f"Falco 룰: {', '.join(masker(r) for r in inc.falco_rules) or '없음'}",
         f"출발지 IP: {inc.src_ip or '알 수 없음'}"
         + (" (사설/내부 IP. NodePort SNAT로 실제 출발지가 가려졌을 수 있음)" if ti is None else ""),
     ]
     if ti:
         head.append(f"출발지 TI: 국가 {ti.get('country') or '-'}, ASN {ti.get('asn_isp') or '-'}, "
                     f"AbuseIPDB {ti.get('abuse_score')}, VirusTotal 악성 {ti.get('vt_text') or '-'}")
-    body = [f"E{i + 1}: {x}" for i, x in enumerate(lines)] or ["(이벤트 없음)"]
-    return "\n".join(["[사건]", *head, "", "[이벤트] (시간순, ×N = 1초 안 반복 횟수)", *body])
+    hooks = {}
+    for r in rows:
+        e = r["event"]
+        if e.policy and hook_name(e) not in hooks:
+            level = level_of(e.policy) if level_of else None
+            hooks[hook_name(e)] = " · ".join(x for x in (hook_help(e), f"경고 단계 {level}" if level else None) if x)
+    hook_lines = [f"- {k}: {v or '설명 없음'}" for k, v in hooks.items()] or ["(정책이 걸린 이벤트 없음)"]
+    body = [f"E{i + 1}: {r['masked']}" for i, r in enumerate(rows)] or ["(이벤트 없음)"]
+    prompt = "\n".join(["[사건]", *head, "", "[걸린 훅] (탐지·차단 정책이 감시하는 지점)", *hook_lines, "",
+                         "[이벤트] (시간순, ×N = 1초 안 반복 횟수)", *body])
+    leaked = masker.leaks(prompt)
+    if leaked:  # 남은 이름이 있으면 한 번 더 가린다
+        log.warning("AI 입력에 가릴 이름이 남아 다시 가림: %s", leaked)
+        prompt = masker(prompt)
+    return prompt
 
 
 # ---- 결과 다듬기 ----
@@ -147,13 +182,14 @@ class AiUnavailable(Exception):
 
 class AiService:
     def __init__(self, settings: Settings, cache: SqliteCache, store: IncidentStore, loki,
-                 gemini: GeminiClient | None, ti=None) -> None:
+                 gemini: GeminiClient | None, ti=None, levels=None) -> None:
         self.s = settings
         self.cache = cache
         self.store = store
         self.loki = loki
         self.gemini = gemini
         self.ti = ti
+        self.levels = levels  # SigmaLevels: 훅 설명에 경고 단계를 붙인다
         self._locks: dict[str, asyncio.Lock] = {}
 
     async def _events(self, inc: Incident) -> list[TetragonEvent]:
@@ -161,7 +197,7 @@ class AiService:
         if not keys or not re.fullmatch(r"[a-z0-9]([-a-z0-9.]*[a-z0-9])?", inc.pod):
             return []
         start = inc.start_ms * 1_000_000 - (self.s.correlate_lookback_sec + 5) * NS
-        end = inc.last_ms * 1_000_000 + 10 * NS
+        end = inc.last_ms * 1_000_000 + LOKI_INGEST_LAG_SEC * NS  # Loki 타임스탬프 = 수집 시각(늦다)
         lines = await self.loki.query_range(f'{self.s.loki_tetragon_selector} |= "{inc.pod}"', start, end, limit=2000)
         evs = []
         for _, line in lines:
@@ -173,6 +209,11 @@ class AiService:
     async def refresh_allowed(self) -> bool:
         bucket = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M")
         return await self.cache.incr("ai_refresh", bucket) <= self.s.ai_refresh_per_min
+
+    async def cached(self, trace_id: str) -> dict | None:
+        """저장된 분석(만료 전). Gemini를 부르지 않는다."""
+        hit = await self.cache.get("ai", trace_id)
+        return hit.value if hit is not None and not hit.expired else None
 
     async def analyze(self, inc: Incident, refresh: bool = False) -> dict:
         if not refresh:
@@ -188,14 +229,17 @@ class AiService:
                 if hit is not None and not hit.expired:
                     return hit.value
             tz = self.s.display_tz
-            lines = event_lines(await self._events(inc), tz, int(self.s.dedup_gap_sec * NS))
+            events = await self._events(inc)
+            masker = Masker(inc, sorted({e.policy for e in events if e.policy}))
+            rows = event_rows(events, tz, int(self.s.dedup_gap_sec * NS), masker)
+            lines = [r["display"] for r in rows]  # 화면 근거는 원래 줄 (같은 E 번호)
             ti = None
             if self.ti is not None and inc.src_ip:
                 try:
                     ti = await self.ti.lookup(inc.src_ip, allow_fetch=False)
                 except ValueError:
                     ti = None  # 사설 IP는 TI 조회 대상이 아니다
-            prompt = build_prompt(inc, lines, ti, tz)
+            prompt = build_prompt(inc, rows, ti, tz, masker, self.levels.tetragon if self.levels else None)
             raw = None
             for attempt in range(2):  # 해석 실패 시 1회 재시도
                 try:
@@ -211,7 +255,7 @@ class AiService:
                             return stale.value
                         raise
             d = finalize(raw, lines)
-            d.update(trace_id=inc.trace_id, model=self.gemini.model,
+            d.update(trace_id=inc.trace_id, model=self.gemini.model, created_ms=int(time.time() * 1000),
                      cached_at=fmt_hms(int(time.time() * 1000), tz), disclaimer=DISCLAIMER, input_lines=len(lines))
             d["markdown"] = render_markdown(d)
             await self.cache.set("ai", inc.trace_id, d, self.s.ai_cache_ttl_days * 86400)

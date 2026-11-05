@@ -887,11 +887,6 @@
             },
             {
               "selector": "trace_id",
-              "text": "AI 분석",
-              "type": "string"
-            },
-            {
-              "selector": "trace_id",
               "text": "trace_id",
               "type": "string"
             },
@@ -1075,7 +1070,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 140
+                "value": 190
               },
               {
                 "id": "color",
@@ -1089,6 +1084,21 @@
                 "value": {
                   "type": "color-text"
                 }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^확인 불가.*",
+                      "result": {
+                        "color": "#8E8E8E",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
               },
               {
                 "id": "links",
@@ -1130,44 +1140,7 @@
                 "id": "links",
                 "value": [
                   {
-                    "title": "Tempo에서 트레이스 열기",
-                    "url": "/explore?left=%7B%22datasource%22:%22tempo-ds%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22tempo-ds%22%7D,%22queryType%22:%22traceql%22,%22query%22:%22${__value.raw}%22%7D%5D,%22range%22:%7B%22from%22:%22now-24h%22,%22to%22:%22now%22%7D%7D",
-                    "targetBlank": true
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "AI 분석"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 90
-              },
-              {
-                "id": "mappings",
-                "value": [
-                  {
-                    "type": "regex",
-                    "options": {
-                      "pattern": ".+",
-                      "result": {
-                        "text": "AI 분석",
-                        "index": 0
-                      }
-                    }
-                  }
-                ]
-              },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "사건 상세 + AI 해석",
+                    "title": "사건 상세 · Trace View + AI 해석",
                     "url": "/d/tefal-incident?var-trace_id=${__data.fields.trace_id}&from=${__data.fields.window_from_ms}&to=${__data.fields.window_to_ms}"
                   }
                 ]
@@ -1238,11 +1211,10 @@
               "MITRE": 6,
               "출발지 IP": 7,
               "트레이스": 8,
-              "AI 분석": 9,
-              "trace_id": 10,
-              "window_from_ms": 11,
-              "window_to_ms": 12,
-              "src_ip": 13
+              "trace_id": 9,
+              "window_from_ms": 10,
+              "window_to_ms": 11,
+              "src_ip": 12
             }
           }
         }

@@ -106,7 +106,7 @@ def parse_event(line: str) -> TetragonEvent | None:
         process=proc,
         parent=_proc(body.get("parent")),
         policy=body.get("policy_name"),
-        function=body.get("function_name"),
+        function=body.get("function_name") or body.get("symbol"),  # uprobe는 symbol(예: uv_spawn)
         action=body.get("action"),
         file_arg=file_arg,
     )

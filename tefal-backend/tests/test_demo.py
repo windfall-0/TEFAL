@@ -88,3 +88,20 @@ def test_demo_ip_per_incident_key():
     assert picks == set(POOL)
     assert demo_ip("10.233.66.37", POOL, "a" * 32) == demo_ip("10.233.66.37", POOL, "a" * 32)
     assert demo_ip("8.8.8.8", POOL, "a" * 32) == "8.8.8.8"
+
+
+def test_src_ip_text_reasons():
+    from app.incidents.store import Incident
+    from app.routers.incidents import src_ip_text
+
+    def inc(**kw):
+        base = {"trace_id": "a" * 32, "start_ms": 0, "anchor_ms": 0, "last_ms": 0, "status": "blocked", "level": "critical",
+                    "level_source": None, "action": "Override", "detected_by": "tetragon", "namespace": "vuln-lab", "pod": "p",
+                    "node": "n", "runtime": None, "runtime_detail": None, "summary": ""}
+        return Incident(**{**base, **kw})
+
+    assert src_ip_text(inc(detected_by="falco"), None) == "확인 불가 (Falco 단독 경보)"
+    assert src_ip_text(inc(), None) == "확인 불가 (HTTP 요청 연결 없음)"
+    assert src_ip_text(inc(beyla_trace_id="b" * 32), None) == "확인 불가"
+    assert src_ip_text(inc(src_ip="10.233.66.37"), "162.142.125.10") == "162.142.125.10 · 시연용"
+    assert src_ip_text(inc(src_ip="8.8.8.8"), "8.8.8.8") == "8.8.8.8"

@@ -25,6 +25,9 @@ log = logging.getLogger(__name__)
 
 NS = 1_000_000_000
 LOKI_LIMIT = 5000
+# Loki 타임스탬프는 이벤트 시각이 아니라 수집 시각이라 수십 초 늦다(확인: 14:48:41 이벤트가 14:49:18).
+# 사건 이벤트를 다시 읽을 때 끝을 이만큼 넉넉히 잡는다. 이벤트 시각으로 다시 거르므로 묶기 결과는 같다.
+LOKI_INGEST_LAG_SEC = 120
 CURSOR_KEY = "tetragon_cursor_ns"
 _POD_RE = re.compile(r"^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$")  # LogQL에 넣기 전 검증
 
@@ -130,7 +133,7 @@ class Collector:
         if not _POD_RE.fullmatch(pod):
             return []
         start = cluster.first.time_ns - (self.s.correlate_lookback_sec + 5) * NS
-        end = cluster.last.time_ns + 10 * NS
+        end = cluster.last.time_ns + LOKI_INGEST_LAG_SEC * NS
         lines = await self.loki.query_range(f'{self.s.loki_tetragon_selector} |= "{pod}"', start, end)
         out = []
         for _, line in lines:

@@ -261,7 +261,7 @@ def overview():
         ("workload", "namespace / pod", "string"), ("runtime", "런타임", "string"),
         ("summary", "행위 요약", "string"), ("mitre_text", "MITRE", "string"),
         ("src_ip_text", "출발지 IP", "string"),
-        ("trace_id", "트레이스", "string"), ("trace_id", "AI 분석", "string"),
+        ("trace_id", "트레이스", "string"),
         ("trace_id", "trace_id", "string"),
         ("window_from_ms", "window_from_ms", "number"), ("window_to_ms", "window_to_ms", "number"),
         ("src_ip", "src_ip", "string"),  # 링크용 원래 값 (표시 열에는 '· 시연용'이 붙을 수 있다)
@@ -279,15 +279,16 @@ def overview():
                  custom__cellOptions={"type": "color-background", "mode": "basic"}),
               ov("런타임", custom__width=80),
               ov("MITRE", custom__width=110),
-              ov("출발지 IP", custom__width=140, color=fixed(BLUE),
+              ov("출발지 IP", custom__width=190, color=fixed(BLUE),
                  custom__cellOptions={"type": "color-text"},
+                 # 출발지를 모르면 '확인 불가 (이유)'가 온다 → 회색
+                 mappings=[{"type": "regex", "options": {"pattern": "^확인 불가.*",
+                                                          "result": {"color": GREY, "index": 0}}}],
                  links=[{"title": "위협 인텔리전스에서 보기",
                          "url": "/d/" + UIDS["ti"] + "?var-ip=${__data.fields.src_ip}&from=now-24h&to=now"}]),
+              # Trace View와 AI 해석이 함께 있는 사건 상세로 간다 (Tempo Explore는 Trace View 패널에서)
               ov("트레이스", custom__width=90, mappings=label_map("트레이스"),
-                 links=[{"title": "Tempo에서 트레이스 열기", "url": explore_tempo("${__value.raw}"),
-                         "targetBlank": True}]),
-              ov("AI 분석", custom__width=90, mappings=label_map("AI 분석"),
-                 links=[{"title": "사건 상세 + AI 해석", "url": INCIDENT_LINK}]),
+                 links=[{"title": "사건 상세 · Trace View + AI 해석", "url": INCIDENT_LINK}]),
               hide("trace_id"), hide("window_from_ms"), hide("window_to_ms"), hide("src_ip"),
           ],
           desc="출처: tefal-backend /incidents. 미차단이 먼저, 그다음 최신순. 단계는 Sigma level, 판정 중 = Falco 경보 후 Tetragon 결과 대기.")
@@ -363,6 +364,8 @@ def incident():
                # traceql 쿼리에 trace ID만 넣으면 화면이 trace 조회로 바꿔 보낸다.
                [{"refId": "A", "datasource": DS_T, "queryType": "traceql", "query": "${trace_id}"}],
                DS_T, {},
+               # ① 큐의 '트레이스' 버튼이 이 화면으로 오므로, Tempo Explore는 패널 링크로 남긴다
+               links=[{"title": "Tempo Explore에서 열기", "url": explore_tempo("${trace_id}"), "targetBlank": True}],
                desc="출처: Tempo. span을 누르면 binary/args, policy·action, exec_id/parent를 볼 수 있습니다. "
                     "계층: app·uprobe → proc → kernel·LSM → falco")
     # Grafana는 trace ID 조회에도 대시보드 시간 범위를 붙인다. 사건 시각 ±5분으로는 늦게 기록된
@@ -370,13 +373,36 @@ def incident():
     tv["timeFrom"] = "7d"
     tv["hideTimeOverride"] = True
 
+    # 사람이 요청할 때만 Gemini를 부른다. 버튼은 이 화면을 ai_req를 붙여 다시 여는 링크다(백엔드 routers/ai.py).
+    btn = ("display:inline-block;margin-top:8px;padding:6px 14px;border-radius:4px;"
+           "background:#3871DC;color:#fff;text-decoration:none;font-weight:500")
+    # 텍스트 패널은 ${__from} 같은 내장 변수를 바꾸지 않아서 응답의 사건 구간으로 시간 범위를 붙인다
+    here = "/d/" + UIDS["incident"] + "?var-trace_id={{trace_id}}&from={{window_from_ms}}&to={{window_to_ms}}"
+    ai_content = "\n".join([
+        '{{#if message}}<p style="color:#FF9830">{{message}}</p>{{/if}}',
+        "{{#if markdown}}",
+        "{{{markdown}}}",
+        "",
+        f'<a href="{here}&var-ai_req=refresh:{{{{trace_id}}}}:{{{{created_ms}}}}" style="{btn};background:#5A6171">↻ 다시 분석</a>',
+        "{{else}}",
+        "아직 AI 분석을 하지 않은 사건입니다.",
+        "",
+        "요청하면 Gemini가 이 사건의 근거 로그를 읽고 판정·MITRE·대응 가이드를 만듭니다 (몇 초 걸립니다).",
+        "",
+        f'<a href="{here}&var-ai_req=run:{{{{trace_id}}}}" style="{btn}">AI 분석 요청</a>',
+        "{{/if}}",
+    ])
     b.add("marcusolsson-dynamictext-panel", "AI 해석 · 대응 가이드", 15, 4, 9, 15,
-          [inf("/ai/analysis/${trace_id}?refresh=${ai_refresh}", [("markdown", "markdown", "string")])],
+          [inf("/ai/analysis/${trace_id}?req=${ai_req}",
+               [("trace_id", "trace_id", "string"), ("markdown", "markdown", "string"),
+                ("created_ms", "created_ms", "number"), ("message", "message", "string"),
+                ("window_from_ms", "window_from_ms", "number"), ("window_to_ms", "window_to_ms", "number")])],
           DS_B,
-          {"renderMode": "everyRow", "content": "{{{markdown}}}", "defaultContent": "분석 결과가 없습니다.",
+          {"renderMode": "everyRow", "content": ai_content, "defaultContent": "AI 분석을 불러오는 중…",
            "editors": ["helpers"], "contentPartials": [], "helpers": "", "styles": "",
            "wrap": True, "editor": {"language": "markdown", "format": "auto"}},
-          desc="Gemini가 근거 로그를 바탕으로 생성. 다시 분석하려면 상단 변수 'AI 다시 분석'을 '예'로 바꾸세요.")
+          desc="Gemini가 근거 로그를 바탕으로 생성합니다. 화면을 열 때는 저장된 결과만 보여 주고, "
+               "[AI 분석 요청]·[다시 분석]을 눌러야 Gemini를 부릅니다.")
 
     b.add("logs", "원본 로그 · 이 사건에 속한 이벤트", 0, 19, 16, 9,
           # `"exec_id":"<값>"`로 거른다: process·parent의 exec_id와 parent_exec_id에 모두 맞고,
@@ -395,7 +421,7 @@ def incident():
                 ("abuse_score", "AbuseIPDB 점수", "number"), ("vt_text", "VirusTotal", "string"),
                 ("notice", "안내", "string")])],
           DS_B, {**stat_opts(fields="/.*/", size=(12, 18)), "orientation": "horizontal"},
-          defaults={"color": fixed("text"), "noValue": "사설 IP 또는 정보 없음",
+          defaults={"color": fixed("text"), "noValue": "출발지 IP 확인 불가 · 사설 IP는 평판 조회를 하지 않음",
                     "thresholds": thresholds((None, "text"))},
           overrides=[ov("AbuseIPDB 점수", unit="none", max=100, color={"mode": "thresholds"},
                         thresholds=thresholds((None, GREY), (25, ORANGE), (75, RED)))],
@@ -404,8 +430,7 @@ def incident():
 
     variables = [
         textbox("trace_id", "incident (trace_id)"),
-        custom("ai_refresh", "AI 다시 분석", "아니오 : false,예 : true", include_all=False, default_all=False)
-        | {"current": {"text": "아니오", "value": "false"}},
+        textbox("ai_req", "AI 요청") | {"hide": 2},  # 버튼이 주소에 붙이는 값. 평소엔 비어 있다
         inf_var("src_ip", "/incidents/${trace_id}", "src_ip"),
         inf_var("exec_id", "/incidents/${trace_id}", "exec_id"),
         inf_var("parent_exec_id", "/incidents/${trace_id}", "parent_exec_id"),

@@ -107,7 +107,7 @@ deploy = {
                                  "114.67.232.93",                                   # China Unicom Beijing (CN)
                                  "219.144.80.143"])},                               # Chinanet Shaanxi Cloud Base (CN)
                             # 5단계 AI 해석 (키는 Secret tefal-backend-token의 GEMINI_API_KEY)
-                            {"name": "GEMINI_MODEL", "value": "gemini-flash-latest"},
+                            {"name": "GEMINI_MODEL", "value": "gemini-3.5-flash-lite"},
                             {"name": "CACHE_DB", "value": "sqlite:////data/tefal.db"}],
                     "securityContext": sec,
                     "resources": {"requests": {"cpu": "50m", "memory": "256Mi"}, "limits": {"memory": "512Mi"}},
