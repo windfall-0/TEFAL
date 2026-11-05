@@ -1,0 +1,16 @@
+# Falcosidekick → tefal-backend webhook (BACKEND_API.md 5.1 POST /ingest/falco)
+# 실제 클러스터에는 <FALCO_WEBHOOK_TOKEN> 을 토큰 값으로 바꾼 사본을 적용했다(마스터 ~/tefal-grafana/falco-webhook-values.yaml, 600).
+# 토큰: kubectl get secret -n monitoring tefal-backend-token -o jsonpath='{.data.FALCO_WEBHOOK_TOKEN}' | base64 -d
+# 적용: helm upgrade falco falcosecurity/falco -n falco --version 9.2.1 --reuse-values -f <사본>
+# 이 파일에는 실제 토큰을 넣지 않는다.
+falcosidekick:
+  enabled: true
+  webui:
+    enabled: true
+    redis:
+      storageEnabled: false # StorageClass 가 없는 실습 환경용
+  config:
+    webhook:
+      address: http://tefal-backend.monitoring.svc:8000/ingest/falco
+      customHeaders: "Authorization:Bearer <FALCO_WEBHOOK_TOKEN>"
+      minimumpriority: warning

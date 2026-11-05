@@ -1,0 +1,19 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# 로컬 데이터 (사건 DB 등)
+tefal-backend/data/
+*.db
+*.db-wal
+*.db-shm
+
+# 생성물 (deploy/backend/gen_backend.py 출력)
+deploy/backend/out/
+
+# 도구 상태
+.omc/
+.env

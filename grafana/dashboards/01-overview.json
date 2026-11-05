@@ -1,0 +1,1692 @@
+{
+  "uid": "tefal-overview",
+  "title": "운영 현황",
+  "description": "TEFAL 메인 · 사건 큐, 차단 현황, 정책 상태",
+  "tags": [
+    "tefal"
+  ],
+  "editable": false,
+  "graphTooltip": 1,
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "5s",
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m"
+    ]
+  },
+  "links": [
+    {
+      "title": "운영 현황",
+      "type": "link",
+      "url": "/d/tefal-overview",
+      "icon": "dashboard",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "사건 상세",
+      "type": "link",
+      "url": "/d/tefal-incident?from=now-24h&to=now",
+      "icon": "dashboard",
+      "keepTime": false,
+      "includeVars": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "위협 인텔리전스",
+      "type": "link",
+      "url": "/d/tefal-ti",
+      "icon": "dashboard",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "인프라",
+      "type": "link",
+      "url": "/d/tefal-infra",
+      "icon": "dashboard",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "Hubble UI",
+      "type": "link",
+      "url": "${hubble_url}",
+      "icon": "external link",
+      "keepTime": false,
+      "includeVars": false,
+      "targetBlank": true,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "Headlamp",
+      "type": "link",
+      "url": "${headlamp_url}",
+      "icon": "external link",
+      "keepTime": false,
+      "includeVars": false,
+      "targetBlank": true,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": ""
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "query",
+        "name": "namespace",
+        "label": "namespace",
+        "hide": 0,
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(kube_pod_info, namespace)",
+          "refId": "ns"
+        },
+        "definition": "label_values(kube_pod_info, namespace)",
+        "refresh": 1,
+        "sort": 1,
+        "includeAll": true,
+        "allValue": "All",
+        "multi": false,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "type": "custom",
+        "name": "runtime",
+        "label": "runtime",
+        "hide": 0,
+        "query": "Java,PHP,Node",
+        "multi": true,
+        "includeAll": true,
+        "options": [],
+        "allValue": "All",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "type": "custom",
+        "name": "status",
+        "label": "상태",
+        "hide": 0,
+        "query": "차단됨 : blocked,미차단 : unblocked,판정 중 : pending",
+        "multi": false,
+        "includeAll": true,
+        "options": [],
+        "allValue": "All",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "type": "custom",
+        "name": "level",
+        "label": "단계",
+        "hide": 0,
+        "query": "Critical : critical,High : high,Medium : medium,Low : low,Info : informational",
+        "multi": true,
+        "includeAll": true,
+        "options": [],
+        "allValue": "All",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "type": "constant",
+        "name": "hubble_url",
+        "label": "Hubble UI URL",
+        "hide": 2,
+        "query": "http://192.168.0.200:31235",
+        "current": {
+          "text": "http://192.168.0.200:31235",
+          "value": "http://192.168.0.200:31235"
+        },
+        "options": []
+      },
+      {
+        "type": "constant",
+        "name": "headlamp_url",
+        "label": "Headlamp URL",
+        "hide": 2,
+        "query": "http://192.168.0.200:31240",
+        "current": {
+          "text": "http://192.168.0.200:31240",
+          "value": "http://192.168.0.200:31240"
+        },
+        "options": []
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "조치 필요 · 미차단",
+      "description": "Falco만 탐지하고 Tetragon이 차단하지 못한 사건. 바로 조치가 필요합니다.",
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "tefal-backend"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "tefal-backend"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "/incidents/summary?from=${__from}&to=${__to}&namespace=${namespace}&runtime=${runtime:csv}&status=${status}&level=${level:csv}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "unblocked_count",
+              "text": "미차단",
+              "type": "number"
+            },
+            {
+              "selector": "unblocked_last_time",
+              "text": "최근",
+              "type": "string"
+            }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "value_and_name",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 14,
+          "valueSize": 48
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#FF7383"
+          },
+          "noValue": "0",
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#FF7383",
+                "value": null
+              }
+            ]
+          },
+          "links": [
+            {
+              "title": "처리할 사건 목록 (미차단)",
+              "url": "/d/tefal-overview?${__url_time_range}&${namespace:queryparam}&${runtime:queryparam}&${level:queryparam}&var-status=unblocked&viewPanel=panel-6"
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "최근"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "text"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "차단",
+      "description": "Tetragon 인라인 차단(Sigkill·Override) 건수. 선택한 시간 범위 기준.",
+      "gridPos": {
+        "x": 6,
+        "y": 9,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "tefal-backend"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "tefal-backend"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "/incidents/summary?from=${__from}&to=${__to}&namespace=${namespace}&runtime=${runtime:csv}&status=${status}&level=${level:csv}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "blocked_count",
+              "text": "차단 (건)",
+              "type": "number"
+            }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 14,
+          "valueSize": 48
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#5794F2"
+          },
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#5794F2",
+                "value": null
+              }
+            ]
+          },
+          "links": [
+            {
+              "title": "시간대별 사건 그래프",
+              "url": "/d/tefal-overview?${__url_time_range}&${namespace:queryparam}&${runtime:queryparam}&${level:queryparam}&${status:queryparam}&viewPanel=panel-8"
+            }
+          ]
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "공격받은 워크로드",
+      "description": "사건이 1건 이상 발생한 pod 수 / 필터에 걸리는 Running pod 수",
+      "gridPos": {
+        "x": 12,
+        "y": 9,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "tefal-backend"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "tefal-backend"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "/incidents/summary?from=${__from}&to=${__to}&namespace=${namespace}&runtime=${runtime:csv}&status=${status}&level=${level:csv}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "attacked_workloads",
+              "text": "공격받음",
+              "type": "number"
+            },
+            {
+              "selector": "total_workloads",
+              "text": "전체 pod",
+              "type": "number"
+            }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "value_and_name",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 14,
+          "valueSize": 48
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "links": [
+            {
+              "title": "워크로드별 사건 막대그래프",
+              "url": "/d/tefal-overview?${__url_time_range}&${namespace:queryparam}&${runtime:queryparam}&${level:queryparam}&${status:queryparam}&viewPanel=panel-7"
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "전체 pod"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8E8E8E"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "수집 상태",
+      "description": "DaemonSet Ready 비율과 Alloy/Loki/Tempo scrape 상태. 1이면 정상입니다.",
+      "gridPos": {
+        "x": 18,
+        "y": 9,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(kube_daemonset_status_number_ready{daemonset=~\".*tetragon.*\"}) / sum(kube_daemonset_status_desired_number_scheduled{daemonset=~\".*tetragon.*\"})",
+          "legendFormat": "Tetragon",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum(kube_daemonset_status_number_ready{daemonset=~\".*falco.*\"}) / sum(kube_daemonset_status_desired_number_scheduled{daemonset=~\".*falco.*\"})",
+          "legendFormat": "Falco",
+          "instant": true,
+          "range": false
+        },
+        {
+          "refId": "C",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "min(up{job=~\".*(alloy|loki|tempo).*\"})",
+          "legendFormat": "Alloy → Loki / Tempo",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "value_and_name",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 14,
+          "valueSize": 16
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "type": "range",
+              "options": {
+                "from": 1,
+                "to": 1000000000.0,
+                "result": {
+                  "text": "정상",
+                  "color": "#73BF69",
+                  "index": 0
+                }
+              }
+            },
+            {
+              "type": "range",
+              "options": {
+                "from": -1000000000.0,
+                "to": 0.9999,
+                "result": {
+                  "text": "이상",
+                  "color": "#FF7383",
+                  "index": 1
+                }
+              }
+            }
+          ],
+          "noValue": "수신 없음",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#FF7383",
+                "value": null
+              },
+              {
+                "color": "#73BF69",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "경고 단계별 탐지 · 로그 기준 (Sigma level)",
+      "description": "Tetragon·Falco 탐지를 정책·룰의 Sigma level별로 더한 값입니다. 같은 프로세스의 같은 행위가 1초 안에 반복되면 1건으로 셉니다. 공격 1번에 탐지가 여러 건 나오므로 사건 수와 단위가 다릅니다(사건별 단계는 사건 큐의 '단계' 열). namespace·시간 범위만 적용되고 런타임·상태·단계 필터는 적용되지 않습니다. Tetragon은 지금 클러스터에 적용된 정책의 로그만 셉니다. 매칭 표는 tefal-backend의 sigma_levels.yaml, 표에 없는 정책·룰은 Info.",
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 24,
+        "h": 3
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "tefal-backend"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "tefal-backend"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "/policies/levels?from=${__from}&to=${__to}&namespace=${namespace}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "level_critical_count",
+              "text": "Critical",
+              "type": "number"
+            },
+            {
+              "selector": "level_high_count",
+              "text": "High",
+              "type": "number"
+            },
+            {
+              "selector": "level_medium_count",
+              "text": "Medium",
+              "type": "number"
+            },
+            {
+              "selector": "level_low_count",
+              "text": "Low",
+              "type": "number"
+            },
+            {
+              "selector": "level_informational_count",
+              "text": "Info",
+              "type": "number"
+            }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "vertical",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 14,
+          "valueSize": 32
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "0",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#8E8E8E"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#8E8E8E",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Critical"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#C4162A"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "High"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF7383"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Medium"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FFB357"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Low"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#E0B400"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Info"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#8E8E8E"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "Critical": 0,
+              "High": 1,
+              "Medium": 2,
+              "Low": 3,
+              "Info": 4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "사건 큐 · trace 1개 = 사건 1건 (미차단 우선 정렬)",
+      "description": "출처: tefal-backend /incidents. 미차단이 먼저, 그다음 최신순. 단계는 Sigma level, 판정 중 = Falco 경보 후 Tetragon 결과 대기.",
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "tefal-backend"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "tefal-backend"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "/incidents?from=${__from}&to=${__to}&namespace=${namespace}&runtime=${runtime:csv}&status=${status}&level=${level:csv}&limit=100",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "time",
+              "text": "시각",
+              "type": "string"
+            },
+            {
+              "selector": "level",
+              "text": "단계",
+              "type": "string"
+            },
+            {
+              "selector": "status",
+              "text": "상태",
+              "type": "string"
+            },
+            {
+              "selector": "workload",
+              "text": "namespace / pod",
+              "type": "string"
+            },
+            {
+              "selector": "runtime",
+              "text": "런타임",
+              "type": "string"
+            },
+            {
+              "selector": "summary",
+              "text": "행위 요약",
+              "type": "string"
+            },
+            {
+              "selector": "mitre_text",
+              "text": "MITRE",
+              "type": "string"
+            },
+            {
+              "selector": "src_ip_text",
+              "text": "출발지 IP",
+              "type": "string"
+            },
+            {
+              "selector": "trace_id",
+              "text": "트레이스",
+              "type": "string"
+            },
+            {
+              "selector": "trace_id",
+              "text": "trace_id",
+              "type": "string"
+            },
+            {
+              "selector": "window_from_ms",
+              "text": "window_from_ms",
+              "type": "number"
+            },
+            {
+              "selector": "window_to_ms",
+              "text": "window_to_ms",
+              "type": "number"
+            },
+            {
+              "selector": "src_ip",
+              "text": "src_ip",
+              "type": "string"
+            }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "noValue": "사건 없음",
+          "links": [
+            {
+              "title": "사건 상세 · Trace View + AI 해석",
+              "url": "/d/tefal-incident?var-trace_id=${__data.fields.trace_id}&from=${__data.fields.window_from_ms}&to=${__data.fields.window_to_ms}"
+            }
+          ]
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "시각"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "단계"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "critical": {
+                        "text": "Critical",
+                        "color": "#C4162A",
+                        "index": 0
+                      },
+                      "high": {
+                        "text": "High",
+                        "color": "#FF7383",
+                        "index": 1
+                      },
+                      "medium": {
+                        "text": "Medium",
+                        "color": "#FFB357",
+                        "index": 2
+                      },
+                      "low": {
+                        "text": "Low",
+                        "color": "#E0B400",
+                        "index": 3
+                      },
+                      "informational": {
+                        "text": "Info",
+                        "color": "#8E8E8E",
+                        "index": 4
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "상태"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "blocked": {
+                        "text": "차단됨",
+                        "color": "#5794F2",
+                        "index": 0
+                      },
+                      "unblocked": {
+                        "text": "미차단",
+                        "color": "#FF7383",
+                        "index": 1
+                      },
+                      "pending": {
+                        "text": "판정 중",
+                        "color": "#8E8E8E",
+                        "index": 2
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "런타임"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "MITRE"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "출발지 IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 190
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": "^확인 불가.*",
+                      "result": {
+                        "color": "#8E8E8E",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "사건 상세 · Trace View + AI 해석",
+                    "url": "/d/tefal-incident?var-trace_id=${__data.fields.trace_id}&from=${__data.fields.window_from_ms}&to=${__data.fields.window_to_ms}"
+                  },
+                  {
+                    "title": "위협 인텔리전스에서 보기",
+                    "url": "/d/tefal-ti?var-ip=${__data.fields.src_ip}&from=now-24h&to=now"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "트레이스"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "regex",
+                    "options": {
+                      "pattern": ".+",
+                      "result": {
+                        "text": "트레이스",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "사건 상세 · Trace View + AI 해석",
+                    "url": "/d/tefal-incident?var-trace_id=${__data.fields.trace_id}&from=${__data.fields.window_from_ms}&to=${__data.fields.window_to_ms}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "trace_id"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "window_from_ms"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "window_to_ms"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "src_ip"
+            },
+            "properties": [
+              {
+                "id": "custom.hidden",
+                "value": true
+              }
+            ]
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "시각": 0,
+              "단계": 1,
+              "상태": 2,
+              "namespace / pod": 3,
+              "런타임": 4,
+              "행위 요약": 5,
+              "MITRE": 6,
+              "출발지 IP": 7,
+              "트레이스": 8,
+              "trace_id": 9,
+              "window_from_ms": 10,
+              "window_to_ms": 11,
+              "src_ip": 12
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "barchart",
+      "title": "워크로드별 사건 · 패치·격리 우선순위",
+      "description": "미차단이 많은 워크로드부터 패치·격리합니다.",
+      "gridPos": {
+        "x": 0,
+        "y": 28,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "tefal-backend"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "tefal-backend"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "/incidents/by-workload?from=${__from}&to=${__to}&namespace=${namespace}&runtime=${runtime:csv}&status=${status}&level=${level:csv}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "pod",
+              "text": "pod",
+              "type": "string"
+            },
+            {
+              "selector": "blocked",
+              "text": "차단",
+              "type": "number"
+            },
+            {
+              "selector": "unblocked",
+              "text": "미차단",
+              "type": "number"
+            }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xField": "pod",
+        "stacking": "normal",
+        "showValue": "auto",
+        "barWidth": 0.5,
+        "groupWidth": 0.7,
+        "fullHighlight": false,
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 90,
+            "lineWidth": 0,
+            "axisPlacement": "auto"
+          },
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "차단"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "미차단"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF7383"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "시간대별 사건 (5분 단위)",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 28,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "tefal-backend"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "tefal-backend"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "/incidents/timeseries?from=${__from}&to=${__to}&namespace=${namespace}&runtime=${runtime:csv}&status=${status}&level=${level:csv}&interval=5m",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "time_ms",
+              "text": "time",
+              "type": "timestamp_epoch"
+            },
+            {
+              "selector": "blocked",
+              "text": "차단",
+              "type": "number"
+            },
+            {
+              "selector": "unblocked",
+              "text": "미차단",
+              "type": "number"
+            }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 90,
+            "lineWidth": 0,
+            "barAlignment": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "showPoints": "never"
+          },
+          "unit": "none",
+          "decimals": 0,
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "차단"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "미차단"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF7383"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "정책 상태",
+      "description": "정책별 시간 범위 안 히트 수 (Tetragon·Falco 로그 기준, 같은 프로세스의 같은 행위가 1초 안에 반복되면 1건). 구분 = 경고 단계",
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "tefal-backend"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "tefal-backend"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "/policies/stats?from=${__from}&to=${__to}&namespace=${namespace}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "policy",
+              "text": "정책",
+              "type": "string"
+            },
+            {
+              "selector": "tag",
+              "text": "구분",
+              "type": "string"
+            },
+            {
+              "selector": "layer",
+              "text": "계층",
+              "type": "string"
+            },
+            {
+              "selector": "action",
+              "text": "액션",
+              "type": "string"
+            },
+            {
+              "selector": "hits",
+              "text": "히트",
+              "type": "number"
+            }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "left",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "구분"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "계층"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 170
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "액션"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 130
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "히트"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 70
+              },
+              {
+                "id": "custom.align",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "정책": 0,
+              "구분": 1,
+              "계층": 2,
+              "액션": 3,
+              "히트": 4
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "marcusolsson-dynamictext-panel",
+      "title": "",
+      "description": "계층별 방어 흐름 · 사건 기준. 앱(uprobe) → 프로세스(kprobe) → 커널(LSM)에서 막혔는지, Falco로만 탐지된 사건은 따로 보여 줍니다. 주황 테두리 = 최근 5분 활동. 줄을 누르면 운영 현황이 그 서비스로, 피드를 누르면 사건 상세로 갑니다.",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "tefal-backend"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "tefal-backend"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "/flow/summary?from=${__from}&to=${__to}&namespace=${namespace}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "html",
+              "text": "html",
+              "type": "string"
+            }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "renderMode": "everyRow",
+        "content": "{{{html}}}",
+        "defaultContent": "계층별 방어 흐름을 불러오는 중…",
+        "editors": [
+          "styles"
+        ],
+        "contentPartials": [],
+        "helpers": "",
+        "styles": ".tf{font-family:Inter,'Noto Sans KR',system-ui,sans-serif;color:#111827;display:flex;flex-direction:column;gap:12px;height:100%;padding:6px 10px;box-sizing:border-box}.tf a{text-decoration:none;color:inherit}.tf-head{display:flex;justify-content:space-between;align-items:center}.tf-title b{font-size:16px}.tf-title span{font-size:12px;color:#4B5563;margin-left:10px}.tf-meta{display:flex;gap:14px;align-items:center;font-size:12px}.tf-live{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:#FFF1E6;color:#B44A00;font-weight:600}.tf-live i{width:8px;height:8px;border-radius:50%;background:#F76808;animation:tfPulse 1.6s infinite}.tf-last{color:#1F4FB8;font-weight:600}.tf-body{display:flex;gap:20px;flex:1;min-height:0}.tf-left{flex:0 0 57%;display:flex;flex-direction:column;gap:10px;min-width:0}.tf-grid{display:grid;grid-template-columns:64px 58px 18px minmax(0,1fr) 18px minmax(0,1fr) 18px minmax(0,1fr) 18px 150px;column-gap:4px;align-items:center}.tf-colhead{padding:0 9px;font-size:11px;color:#4B5563;font-weight:600}.tf-colhead span{text-align:center}.tf-colhead span:first-child{text-align:left}.tf-box{position:relative;display:flex;flex-direction:column;gap:6px;padding:11px 8px 7px;border-radius:10px}.tf-box.tet{border:1px solid #DCE6F7;background:#F8FAFF}.tf-box.fal{border:1px solid #F7D4D5;background:#FFF8F8}.tf-tag{position:absolute;top:-8px;left:10px;padding:0 6px;background:#FFFFFF;font-size:10px;font-weight:700}.tet .tf-tag{color:#1E3A8A}.fal .tf-tag{color:#9B1C1F}.tf-name{font-size:14px;font-weight:700;white-space:nowrap}.fal .tf-name{font-size:13px}.tf-inc{text-align:center;font-size:18px;font-weight:700;border:1px solid #D1D5DB;border-radius:8px;padding:5px 0;background:#FFFFFF}.tf-cell{display:flex;align-items:baseline;justify-content:center;gap:6px;border-radius:8px;padding:6px 8px;min-width:0}.tf-cell b{font-size:18px}.tf-cell small{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tf-cell.lv1{background:#DCE8FD;color:#1E3A8A}.tf-cell.lv2{background:#A9C7F9;color:#0F2A6B}.tf-cell.lv3{background:#2F64D6;color:#FFFFFF}.tf-cell.zero,.tf-cell.none{background:#F3F4F6;color:#4B5563}.tf-cell.recent{outline:2px solid #F76808;animation:tfPulse 1.6s infinite}.tf-arrow{width:18px;height:12px;justify-self:center;background-color:#D1D5DB;clip-path:polygon(0 5px,13.6px 5px,10.2px 1.6px,11.6px .2px,17.4px 6px,11.6px 11.8px,10.2px 10.4px,13.6px 7px,0 7px)}.tf-arrow.on{background-color:#9CA3AF;background-image:linear-gradient(90deg,transparent,#2F64D6,transparent);background-repeat:no-repeat;background-size:6px 12px;background-position:-6px 0;animation:tfGlow 2.6s ease-in-out infinite}.tf-wall{justify-self:center;width:11px;height:11px;margin-right:5px;border-top:3.5px solid #0E2C6E;border-right:3.5px solid #0E2C6E;transform:rotate(45deg)}.tf-result{display:flex;align-items:center;justify-content:space-between;background:#9EDB8F;color:#0E3B1A;border:1px solid #5DB55A;border-radius:8px;padding:6px 10px;font-size:12px}.tf-result b{font-size:15px}.tf-result small{color:#24562A;font-size:12px}.tf-falrow{display:grid;grid-template-columns:64px 58px minmax(0,1fr) 150px;column-gap:4px;align-items:center}.tf-dash{display:flex;align-items:center;gap:10px;color:#6B7280;font-size:12px;margin-left:22px}.tf-dash i{flex:1;height:2px;background:repeating-linear-gradient(90deg,#F3A5A8 0 6px,transparent 6px 12px);animation:tfDash 3s linear infinite}.tf-unblocked{display:flex;align-items:center;justify-content:center;background:#E5484D;color:#FFFFFF;border-radius:8px;padding:7px 10px;font-size:15px;font-weight:700}.tf-unblocked.zero{background:#F3F4F6;color:#4B5563}.tf-feed{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;border-left:1px solid #E5E7EB;padding-left:20px}.tf-feedhead{display:flex;justify-content:space-between;font-size:11px;color:#4B5563;font-weight:600}.tf-feedhead a{color:#1F60C4}.tf-item{display:grid;grid-template-columns:64px 54px minmax(0,1fr) auto;gap:8px;align-items:center;padding:6px 8px;border-radius:6px;border:1px solid #F3F4F6}.tf-item:hover{border-color:#D1D5DB}.tf-item.new{border-color:#FFD8B8;animation:tfIn .6s ease-out 1,tfNew 2.4s ease-out .6s 1 both}.tf-time{font-size:12px;color:#374151;font-variant-numeric:tabular-nums}.tf-svc{font-size:11px;font-weight:700;color:#1E3A8A;background:#DCE8FD;border-radius:4px;padding:2px 6px;text-align:center}.tf-svc.falco{color:#9B1C1F;background:#FDE2E3}.tf-path{font-size:12px;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tf-path b{color:#1F4FB8}.tf-badge{font-size:11px;font-weight:700;color:#0E3B1A;background:#9EDB8F;border:1px solid #5DB55A;border-radius:999px;padding:2px 8px}.tf-badge.bad{color:#FFFFFF;background:#E5484D;border-color:#E5484D}.tf-empty{font-size:12px;color:#6B7280;padding:8px}@keyframes tfPulse{0%{box-shadow:0 0 0 0 rgba(247,104,8,.55)}70%{box-shadow:0 0 0 8px rgba(247,104,8,0)}100%{box-shadow:0 0 0 0 rgba(247,104,8,0)}}@keyframes tfGlow{0%{background-position:-6px 0}100%{background-position:18px 0}}@keyframes tfDash{to{background-position:24px 0}}@keyframes tfIn{0%{transform:translateY(-8px);opacity:0}100%{transform:none;opacity:1}}@keyframes tfNew{0%{background:#FFF1E6}100%{background:#FFFFFF}}",
+        "wrap": false,
+        "editor": {
+          "language": "html",
+          "format": "auto"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    }
+  ]
+}

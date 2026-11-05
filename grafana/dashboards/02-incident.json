@@ -1,0 +1,775 @@
+{
+  "uid": "tefal-incident",
+  "title": "사건 상세",
+  "description": "사건 1건의 Trace, 원본 로그, AI 해석. 사건 큐에서 들어오면 사건 시각 ±5분으로 열립니다.",
+  "tags": [
+    "tefal"
+  ],
+  "editable": false,
+  "graphTooltip": 1,
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "refresh": "",
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m"
+    ]
+  },
+  "links": [
+    {
+      "title": "운영 현황",
+      "type": "link",
+      "url": "/d/tefal-overview",
+      "icon": "dashboard",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "사건 상세",
+      "type": "link",
+      "url": "/d/tefal-incident?from=now-24h&to=now",
+      "icon": "dashboard",
+      "keepTime": false,
+      "includeVars": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "위협 인텔리전스",
+      "type": "link",
+      "url": "/d/tefal-ti",
+      "icon": "dashboard",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "인프라",
+      "type": "link",
+      "url": "/d/tefal-infra",
+      "icon": "dashboard",
+      "keepTime": true,
+      "includeVars": false,
+      "targetBlank": false,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "Hubble UI",
+      "type": "link",
+      "url": "${hubble_url}",
+      "icon": "external link",
+      "keepTime": false,
+      "includeVars": false,
+      "targetBlank": true,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": ""
+    },
+    {
+      "title": "Headlamp",
+      "type": "link",
+      "url": "${headlamp_url}",
+      "icon": "external link",
+      "keepTime": false,
+      "includeVars": false,
+      "targetBlank": true,
+      "asDropdown": false,
+      "tags": [],
+      "tooltip": ""
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "query",
+        "name": "trace_id",
+        "label": "사건",
+        "hide": 0,
+        "datasource": {
+          "type": "yesoreyeram-infinity-datasource",
+          "uid": "tefal-backend"
+        },
+        "query": {
+          "queryType": "infinity",
+          "query": "",
+          "refId": "var-trace_id",
+          "infinityQuery": {
+            "type": "json",
+            "source": "url",
+            "parser": "backend",
+            "format": "table",
+            "url": "/incidents/recent?limit=50",
+            "url_options": {
+              "method": "GET",
+              "data": ""
+            },
+            "root_selector": "",
+            "columns": [
+              {
+                "selector": "option_text",
+                "text": "__text",
+                "type": "string"
+              },
+              {
+                "selector": "trace_id",
+                "text": "__value",
+                "type": "string"
+              }
+            ],
+            "filters": []
+          }
+        },
+        "refresh": 1,
+        "sort": 0,
+        "options": [],
+        "current": {},
+        "includeAll": false,
+        "multi": false,
+        "allowCustomValue": true
+      },
+      {
+        "type": "textbox",
+        "name": "ai_req",
+        "label": "AI 요청",
+        "hide": 2,
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "options": []
+      },
+      {
+        "type": "query",
+        "name": "src_ip",
+        "label": "src_ip",
+        "hide": 2,
+        "datasource": {
+          "type": "yesoreyeram-infinity-datasource",
+          "uid": "tefal-backend"
+        },
+        "query": {
+          "queryType": "infinity",
+          "query": "",
+          "refId": "var-src_ip",
+          "infinityQuery": {
+            "type": "json",
+            "source": "url",
+            "parser": "backend",
+            "format": "table",
+            "url": "/incidents/${trace_id}",
+            "url_options": {
+              "method": "GET",
+              "data": ""
+            },
+            "root_selector": "",
+            "columns": [
+              {
+                "selector": "src_ip",
+                "text": "src_ip",
+                "type": "string"
+              }
+            ],
+            "filters": []
+          }
+        },
+        "refresh": 1,
+        "options": [],
+        "current": {},
+        "includeAll": false,
+        "multi": false
+      },
+      {
+        "type": "query",
+        "name": "exec_id",
+        "label": "exec_id",
+        "hide": 2,
+        "datasource": {
+          "type": "yesoreyeram-infinity-datasource",
+          "uid": "tefal-backend"
+        },
+        "query": {
+          "queryType": "infinity",
+          "query": "",
+          "refId": "var-exec_id",
+          "infinityQuery": {
+            "type": "json",
+            "source": "url",
+            "parser": "backend",
+            "format": "table",
+            "url": "/incidents/${trace_id}",
+            "url_options": {
+              "method": "GET",
+              "data": ""
+            },
+            "root_selector": "",
+            "columns": [
+              {
+                "selector": "exec_id",
+                "text": "exec_id",
+                "type": "string"
+              }
+            ],
+            "filters": []
+          }
+        },
+        "refresh": 1,
+        "options": [],
+        "current": {},
+        "includeAll": false,
+        "multi": false
+      },
+      {
+        "type": "query",
+        "name": "parent_exec_id",
+        "label": "parent_exec_id",
+        "hide": 2,
+        "datasource": {
+          "type": "yesoreyeram-infinity-datasource",
+          "uid": "tefal-backend"
+        },
+        "query": {
+          "queryType": "infinity",
+          "query": "",
+          "refId": "var-parent_exec_id",
+          "infinityQuery": {
+            "type": "json",
+            "source": "url",
+            "parser": "backend",
+            "format": "table",
+            "url": "/incidents/${trace_id}",
+            "url_options": {
+              "method": "GET",
+              "data": ""
+            },
+            "root_selector": "",
+            "columns": [
+              {
+                "selector": "parent_exec_id",
+                "text": "parent_exec_id",
+                "type": "string"
+              }
+            ],
+            "filters": []
+          }
+        },
+        "refresh": 1,
+        "options": [],
+        "current": {},
+        "includeAll": false,
+        "multi": false
+      },
+      {
+        "type": "constant",
+        "name": "loki_selector",
+        "label": "Loki 셀렉터",
+        "hide": 2,
+        "query": "{namespace=\"kube-system\", container=\"export-stdout\"}",
+        "current": {
+          "text": "{namespace=\"kube-system\", container=\"export-stdout\"}",
+          "value": "{namespace=\"kube-system\", container=\"export-stdout\"}"
+        },
+        "options": []
+      },
+      {
+        "type": "constant",
+        "name": "hubble_url",
+        "label": "Hubble UI URL",
+        "hide": 2,
+        "query": "http://192.168.0.200:31235",
+        "current": {
+          "text": "http://192.168.0.200:31235",
+          "value": "http://192.168.0.200:31235"
+        },
+        "options": []
+      },
+      {
+        "type": "constant",
+        "name": "headlamp_url",
+        "label": "Headlamp URL",
+        "hide": 2,
+        "query": "http://192.168.0.200:31240",
+        "current": {
+          "text": "http://192.168.0.200:31240",
+          "value": "http://192.168.0.200:31240"
+        },
+        "options": []
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "사건 요약",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "tefal-backend"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "tefal-backend"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "/incidents/${trace_id}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "status_text",
+              "text": "상태",
+              "type": "string"
+            },
+            {
+              "selector": "workload",
+              "text": "워크로드",
+              "type": "string"
+            },
+            {
+              "selector": "runtime_detail",
+              "text": "런타임",
+              "type": "string"
+            },
+            {
+              "selector": "time_text",
+              "text": "시작",
+              "type": "string"
+            },
+            {
+              "selector": "mitre_text",
+              "text": "MITRE",
+              "type": "string"
+            },
+            {
+              "selector": "src_ip_text",
+              "text": "출발지 IP",
+              "type": "string"
+            },
+            {
+              "selector": "window_from_ms",
+              "text": "window_from_ms",
+              "type": "number"
+            },
+            {
+              "selector": "window_to_ms",
+              "text": "window_to_ms",
+              "type": "number"
+            }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^(상태|워크로드|런타임|시작|MITRE|출발지 IP)$/"
+        },
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 18
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "사건을 선택하세요",
+          "links": [
+            {
+              "title": "이 사건 시각으로 맞추기 (±5분)",
+              "url": "/d/tefal-incident?var-trace_id=${trace_id}&from=${__data.fields.window_from_ms}&to=${__data.fields.window_to_ms}"
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "links": [
+        {
+          "title": "이 사건 시각으로 맞추기 (±5분)",
+          "url": "/d/tefal-incident?var-trace_id=${trace_id}&from=${__data.fields.window_from_ms}&to=${__data.fields.window_to_ms}"
+        },
+        {
+          "title": "← 사건 큐",
+          "url": "/d/tefal-overview?from=now-1h&to=now"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "traces",
+      "title": "Trace View · 계층별 인과 흐름",
+      "description": "출처: Tempo. span을 누르면 binary/args, policy·action, exec_id/parent를 볼 수 있습니다. 계층: app·uprobe → proc → kernel·LSM → falco",
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 15,
+        "h": 15
+      },
+      "datasource": {
+        "type": "tempo",
+        "uid": "tempo-ds"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "tempo",
+            "uid": "tempo-ds"
+          },
+          "queryType": "traceql",
+          "query": "${trace_id}"
+        }
+      ],
+      "options": {},
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "links": [
+        {
+          "title": "Tempo Explore에서 열기",
+          "url": "/explore?left=%7B%22datasource%22:%22tempo-ds%22,%22queries%22:%5B%7B%22refId%22:%22A%22,%22datasource%22:%7B%22type%22:%22tempo%22,%22uid%22:%22tempo-ds%22%7D,%22queryType%22:%22traceql%22,%22query%22:%22${trace_id}%22%7D%5D,%22range%22:%7B%22from%22:%22now-24h%22,%22to%22:%22now%22%7D%7D",
+          "targetBlank": true
+        }
+      ],
+      "timeFrom": "7d",
+      "hideTimeOverride": true
+    },
+    {
+      "id": 3,
+      "type": "marcusolsson-dynamictext-panel",
+      "title": "AI 해석 · 대응 가이드",
+      "description": "Gemini가 근거 로그를 바탕으로 생성합니다. 화면을 열 때는 저장된 결과만 보여 주고, [AI 분석 요청]·[다시 분석]을 눌러야 Gemini를 부릅니다.",
+      "gridPos": {
+        "x": 15,
+        "y": 4,
+        "w": 9,
+        "h": 15
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "tefal-backend"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "tefal-backend"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "/ai/analysis/${trace_id}?req=${ai_req}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "trace_id",
+              "text": "trace_id",
+              "type": "string"
+            },
+            {
+              "selector": "markdown",
+              "text": "markdown",
+              "type": "string"
+            },
+            {
+              "selector": "created_ms",
+              "text": "created_ms",
+              "type": "number"
+            },
+            {
+              "selector": "message",
+              "text": "message",
+              "type": "string"
+            },
+            {
+              "selector": "window_from_ms",
+              "text": "window_from_ms",
+              "type": "number"
+            },
+            {
+              "selector": "window_to_ms",
+              "text": "window_to_ms",
+              "type": "number"
+            }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "renderMode": "everyRow",
+        "content": "{{#if message}}<p style=\"color:#FF9830\">{{message}}</p>{{/if}}\n{{#if markdown}}\n{{{markdown}}}\n\n<a href=\"/d/tefal-incident?var-trace_id={{trace_id}}&from={{window_from_ms}}&to={{window_to_ms}}&var-ai_req=refresh:{{trace_id}}:{{created_ms}}\" style=\"display:inline-block;margin-top:8px;padding:6px 14px;border-radius:4px;background:#3871DC;color:#fff;text-decoration:none;font-weight:500;background:#5A6171\">↻ 다시 분석</a>\n{{else}}\n아직 AI 분석을 하지 않은 사건입니다.\n\n요청하면 Gemini가 이 사건의 근거 로그를 읽고 판정·MITRE·대응 가이드를 만듭니다 (몇 초 걸립니다).\n\n<a href=\"/d/tefal-incident?var-trace_id={{trace_id}}&from={{window_from_ms}}&to={{window_to_ms}}&var-ai_req=run:{{trace_id}}\" style=\"display:inline-block;margin-top:8px;padding:6px 14px;border-radius:4px;background:#3871DC;color:#fff;text-decoration:none;font-weight:500\">AI 분석 요청</a>\n{{/if}}",
+        "defaultContent": "AI 분석을 불러오는 중…",
+        "editors": [
+          "helpers"
+        ],
+        "contentPartials": [],
+        "helpers": "",
+        "styles": "",
+        "wrap": true,
+        "editor": {
+          "language": "markdown",
+          "format": "auto"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "logs",
+      "title": "원본 로그 · 이 사건에 속한 이벤트",
+      "description": "출처: Loki · exec_id 와 parent exec_id 로 필터. JSON을 줄바꿈해 보여 줍니다(Prettify JSON). 숫자(시각 등)만 다른 연속 줄은 한 줄로 접어 반복 횟수를 표시합니다 (중복 제거: Numbers)",
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 16,
+        "h": 9
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "${loki_selector} |= `\"exec_id\":\"${exec_id}\"`",
+          "queryType": "range"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "loki",
+            "uid": "P8E80F9AEF21F6940"
+          },
+          "expr": "${loki_selector} |= `\"exec_id\":\"${parent_exec_id}\"`",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "dedupStrategy": "numbers",
+        "sortOrder": "Ascending"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "출발지 IP 요약",
+      "description": "",
+      "gridPos": {
+        "x": 16,
+        "y": 19,
+        "w": 8,
+        "h": 9
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "tefal-backend"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "tefal-backend"
+          },
+          "type": "json",
+          "source": "url",
+          "parser": "backend",
+          "format": "table",
+          "url": "/ti/ip/${src_ip}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "ip",
+              "text": "IP",
+              "type": "string"
+            },
+            {
+              "selector": "country_asn",
+              "text": "국가 / ASN",
+              "type": "string"
+            },
+            {
+              "selector": "abuse_score",
+              "text": "AbuseIPDB 점수",
+              "type": "number"
+            },
+            {
+              "selector": "vt_text",
+              "text": "VirusTotal",
+              "type": "string"
+            },
+            {
+              "selector": "notice",
+              "text": "안내",
+              "type": "string"
+            }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/.*/"
+        },
+        "textMode": "value_and_name",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "wideLayout": true,
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 18
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "noValue": "출발지 IP 확인 불가 · 사설 IP는 평판 조회를 하지 않음",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "AbuseIPDB 점수"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "#8E8E8E",
+                      "value": null
+                    },
+                    {
+                      "color": "#FFB357",
+                      "value": 25
+                    },
+                    {
+                      "color": "#FF7383",
+                      "value": 75
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "links": [
+        {
+          "title": "TI 탭에서 보기 →",
+          "url": "/d/tefal-ti?var-ip=${src_ip}&from=now-24h&to=now"
+        }
+      ]
+    }
+  ]
+}

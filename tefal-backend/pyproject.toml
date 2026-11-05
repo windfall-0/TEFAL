@@ -1,0 +1,37 @@
+[project]
+name = "tefal-backend"
+version = "0.1.0"
+description = "TEFAL Grafana 대시보드용 조회 전용 API 서버"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "httpx>=0.27",
+    "pydantic-settings>=2.6",
+    "aiosqlite>=0.20",
+    "prometheus-client>=0.21",
+    "tzdata>=2024.2",
+    "grpcio>=1.66",
+    "protobuf>=7.35.1",
+    "maxminddb>=2.6",
+]
+
+[dependency-groups]
+dev = [
+    "grpcio-tools>=1.85.1",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "respx>=0.21",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+extend-exclude = ["app/hubble/pb"]
