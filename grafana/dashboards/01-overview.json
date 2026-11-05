@@ -1686,8 +1686,7 @@
       "fieldConfig": {
         "defaults": {},
         "overrides": []
-      },
-      "transparent": true
+      }
     }
   ]
 }
