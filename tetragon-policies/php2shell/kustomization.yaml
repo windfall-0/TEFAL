@@ -1,0 +1,8 @@
+# php2shell 정책 일괄 배포 — 항상 ../tetra-sync.sh 로만 배포
+# ※ uprobe 2개(zifsystem·popen)는 경로 PID 때문에 kustomization 제외 → tetra-sync.sh가 apply -f로 적용.
+#   (react2shell과 동일한 패턴: uprobe는 스크립트가 PID 주입 후 apply -f)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - php2shell-lsm-bprmcheck-block.yaml
+  - php2shell-kprobe-execve-observe.yaml

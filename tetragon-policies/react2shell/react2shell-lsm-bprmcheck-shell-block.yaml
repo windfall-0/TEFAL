@@ -1,0 +1,38 @@
+# [react2shell / lsm / block] bprm_check_security — 셸 실행 거부  ★핵심 차단
+# Stage 3: node 웹앱이 셸(/sh,/dash,/bash)을 실행하려 하면 Sigkill(프로세스 강제 종료)로 차단. (팀원 최종: Override→Sigkill)
+# ⚠️ 01/02 LSM(observe·detect)과 동시에 쌓아 올리지 말 것(팀원 주의). /usr/bin/id 나 모든 RCE를 막지는 않음.
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicyNamespaced
+metadata:
+  name: react2shell-lsm-bprmcheck-shell-block   # (옛 이름: r2s-final-shell-block)
+  namespace: vuln-lab
+  labels:
+    tefal.io/vuln: react2shell
+    tefal.io/layer: lsm
+    tefal.io/hook: bprmcheck
+    tefal.io/action: block
+spec:
+  podSelector:
+    matchLabels:
+      app: react2shell
+      lab: vuln
+  lsmhooks:
+    - hook: bprm_check_security
+      message: "R2S stage3: shell execution denied at LSM"
+      tags:
+        - r2s.stage3.enforcement
+      args:
+        - index: 0
+          type: string
+          resolve: filename
+      selectors:
+        - matchArgs:
+            - index: 0
+              operator: Postfix
+              values:
+                - /sh
+                - /dash
+                - /bash
+          matchActions:
+            - action: Override
+              argError: -1

@@ -1,0 +1,29 @@
+# [log4shell / kprobe / observe] tcp_connect — 외부 아웃바운드 연결 시도 탐지 (JNDI 호출/유출 신호) (Post)
+# (구 detect-v2 에서 분리)
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicyNamespaced
+metadata:
+  name: log4shell-kprobe-tcpconnect-observe
+  namespace: vuln-lab
+  labels:
+    tefal.io/vuln: log4shell
+    tefal.io/layer: kprobe
+    tefal.io/hook: tcpconnect
+    tefal.io/action: observe
+spec:
+  podSelector:
+    matchLabels:
+      app: log4shell
+  kprobes:
+  - call: "tcp_connect"
+    syscall: false
+    args:
+    - index: 0
+      type: "sock"
+    selectors:
+    - matchBinaries:
+      - operator: "In"
+        values:
+        - "/usr/lib/jvm/java-1.8-openjdk/jre/bin/java"
+      matchActions:
+      - action: Post

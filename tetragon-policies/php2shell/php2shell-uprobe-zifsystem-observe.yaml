@@ -1,0 +1,28 @@
+# [php2shell / uprobe / observe] libphp.so zif_system/php_exec — PHP system()/exec 호출 관측 (Post)
+# ⚠️ 경로 PID(4602)는 하드코딩 → php-sync.sh가 현재 PID를 자동 주입해 적용한다. 직접 apply 금지.
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: php2shell-uprobe-zifsystem-observe   # (옛 이름: php2shell-zif-post)
+  labels:
+    tefal.io/vuln: php2shell
+    tefal.io/layer: uprobe
+    tefal.io/hook: zifsystem
+    tefal.io/action: observe
+spec:
+  uprobes:
+  - path: "/procRoot/4052/root/usr/lib/apache2/modules/libphp.so"
+    symbols:
+    - "zif_system"
+    selectors:
+    - matchActions:
+      - action: "Post"
+  - path: "/procRoot/4052/root/usr/lib/apache2/modules/libphp.so"
+    symbols:
+    - "php_exec"
+    args:
+    - index: 1
+      type: "string"
+    selectors:
+    - matchActions:
+      - action: "Post"

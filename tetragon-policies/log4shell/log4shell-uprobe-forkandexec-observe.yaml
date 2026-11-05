@@ -1,0 +1,23 @@
+# [log4shell / uprobe / observe] libjava.so forkAndExec — JVM이 프로세스를 만들려는 길목 관측 (Post)
+# ⚠️ 경로의 PID(4662)는 하드코딩 → 파드 재시작 시 load_error. 직접 apply 말고 sync-uprobe.sh 로 적용할 것.
+#    (sync 스크립트가 현재 JVM PID를 자동 탐지해 이 정책을 재생성·적용함)
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: log4shell-uprobe-forkandexec-observe
+  labels:
+    tefal.io/vuln: log4shell
+    tefal.io/layer: uprobe
+    tefal.io/hook: forkandexec
+    tefal.io/action: observe
+spec:
+  podSelector:
+    matchLabels:
+      app: log4shell
+  uprobes:
+  - path: /procRoot/7615/root/usr/lib/jvm/java-1.8-openjdk/jre/lib/amd64/libjava.so
+    symbols:
+    - Java_java_lang_UNIXProcess_forkAndExec
+    selectors:
+    - matchActions:
+      - action: Post

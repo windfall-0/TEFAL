@@ -1,0 +1,29 @@
+# [log4shell / kprobe / observe] sys_memfd_create — 파일리스(RAM 가상파일) 선행 행위 탐지 (Post)
+# memfd_create(name, flags) → 이름은 index 0. (구 detect-v2 에서 분리)
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicyNamespaced
+metadata:
+  name: log4shell-kprobe-memfd-observe
+  namespace: vuln-lab
+  labels:
+    tefal.io/vuln: log4shell
+    tefal.io/layer: kprobe
+    tefal.io/hook: memfd
+    tefal.io/action: observe
+spec:
+  podSelector:
+    matchLabels:
+      app: log4shell
+  kprobes:
+  - call: "sys_memfd_create"
+    syscall: true
+    args:
+    - index: 0
+      type: "string"
+    selectors:
+    - matchBinaries:
+      - operator: "In"
+        values:
+        - "/usr/lib/jvm/java-1.8-openjdk/jre/bin/java"
+      matchActions:
+      - action: Post

@@ -1,0 +1,35 @@
+# [log4shell / lsm / block] BPF-LSM bprm_check_security — 커널 인라인 차단
+# java(JVM)가 다른 프로그램을 실행하려 하면 Override(-1, EPERM)로 실행 거부 (프로세스는 안 죽음)
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicyNamespaced
+metadata:
+  name: log4shell-lsm-bprmcheck-block
+  namespace: vuln-lab
+  labels:
+    tefal.io/vuln: log4shell
+    tefal.io/layer: lsm
+    tefal.io/hook: bprmcheck
+    tefal.io/action: block
+spec:
+  podSelector:
+    matchLabels:
+      app: log4shell
+  lsmhooks:
+  - hook: "bprm_check_security"
+    args:
+    - index: 0
+      type: "linux_binprm"
+    selectors:
+    - matchBinaries:
+      - operator: "In"
+        values:
+        - "/usr/lib/jvm/java-1.8-openjdk/jre/bin/java"
+      matchArgs:            # java→java 재실행은 제외 (파드 기동·재시작 정상)
+      - index: 0
+        operator: "NotEqual"
+        values:
+        - "/usr/lib/jvm/java-1.8-openjdk/jre/bin/java"
+        - "/usr/bin/java"
+      matchActions:
+      - action: Override
+        argError: -1

@@ -1,0 +1,15 @@
+# log4shell 정책 일괄 배포 — 항상 ../tetra-sync.sh 로만 배포
+# LSM + kprobe 5종 적용 (= kubectl apply -k .)
+# ※ uprobe(forkandexec)는 경로 PID 때문에 제외 → tetra-sync.sh가 apply -f로 적용.
+# ※ egress(CiliumNetworkPolicy)는 데모 토글 위해 자동배포 제외(파일은 보존). 필요 시 수동:
+#     켜기:  kubectl apply  -f log4shell-egress-block.yaml
+#     끄기:  kubectl delete cnp log4shell-egress-block -n vuln-lab
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - log4shell-lsm-bprmcheck-block.yaml       # ★ 커널 차단
+  - log4shell-kprobe-execve-observe.yaml     # 탐지
+  - log4shell-kprobe-execveat-observe.yaml   # 탐지
+  - log4shell-kprobe-memfd-observe.yaml      # 탐지
+  - log4shell-kprobe-tcpconnect-observe.yaml # 탐지
+  - log4shell-kprobe-fileperm-observe.yaml   # 탐지

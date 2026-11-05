@@ -1,0 +1,28 @@
+# [react2shell / uprobe / observe] node uv_spawn — Node가 자식 프로세스를 생성하는 길목 관측 (Post)
+# ⚠️ 경로 PID(3636)는 하드코딩 → uprobe-sync-all.sh 가 현재 node PID를 자동 주입해 적용. 직접 apply 금지.
+# 참고: uv_spawn index2는 옵션 포인터라 실제 명령 문자열 직접 추출은 미완(팀원 한계 명시).
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicy
+metadata:
+  name: react2shell-uprobe-uvspawn-observe   # (옛 이름: r2s-final-uv-spawn-observe)
+  labels:
+    tefal.io/vuln: react2shell
+    tefal.io/layer: uprobe
+    tefal.io/hook: uvspawn
+    tefal.io/action: observe
+spec:
+  podSelector:
+    matchLabels:
+      app: react2shell
+      lab: vuln
+  uprobes:
+    - path: /procRoot/4769/root/usr/local/bin/node
+      symbols:
+        - uv_spawn
+      args:
+        - index: 2
+          type: uint64
+          label: options_pointer
+      selectors:
+        - matchActions:
+            - action: Post

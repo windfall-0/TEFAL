@@ -1,0 +1,37 @@
+# [php2shell / lsm / block] BPF-LSM bprm_check_security — 커널 인라인 차단  ★핵심 차단
+# apache/httpd가 셸(/bin/sh,dash,env)을 실행하려 하면 Override(-1, EPERM)로 실행 거부.
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicyNamespaced
+metadata:
+  name: php2shell-lsm-bprmcheck-block     # (옛 이름: php2shell-lsm-override)
+  namespace: vuln-lab
+  labels:
+    tefal.io/vuln: php2shell
+    tefal.io/layer: lsm
+    tefal.io/hook: bprmcheck
+    tefal.io/action: block
+spec:
+  podSelector:
+    matchLabels:
+      app: php2shell
+  lsmhooks:
+  - hook: "bprm_check_security"
+    args:
+    - index: 0
+      type: "file"
+      resolve: "file"
+    selectors:
+    - matchBinaries:
+      - operator: "In"
+        values: ["/usr/sbin/apache2", "/usr/sbin/httpd"]
+      matchArgs:
+      - index: 0
+        operator: "Equal"
+        values:
+        - "/bin/sh"
+        - "/bin/dash"      # 심볼릭 링크 실제 경로 추가
+        - "/usr/bin/dash"
+        - "/usr/bin/env"
+      matchActions:
+      - action: "Override" # 커널 실행 거부 (차단)
+        argError: -1       # -EPERM 반환

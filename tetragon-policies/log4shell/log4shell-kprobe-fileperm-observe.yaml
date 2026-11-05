@@ -1,0 +1,41 @@
+# [log4shell / kprobe / observe] security_file_permission — /tmp 하위 쓰기(mask=2) 탐지 (fileless) (Post)
+# index 0 = file(경로), index 1 = mask (MAY_WRITE=2). (구 detect-v2 에서 분리)
+# 이벤트가 안 보이면 index:1 matchArg를 지워 /tmp 모든 접근으로 완화해 먼저 확인.
+apiVersion: cilium.io/v1alpha1
+kind: TracingPolicyNamespaced
+metadata:
+  name: log4shell-kprobe-fileperm-observe
+  namespace: vuln-lab
+  labels:
+    tefal.io/vuln: log4shell
+    tefal.io/layer: kprobe
+    tefal.io/hook: fileperm
+    tefal.io/action: observe
+spec:
+  podSelector:
+    matchLabels:
+      app: log4shell
+  kprobes:
+  - call: "security_file_permission"
+    syscall: false
+    args:
+    - index: 0
+      type: "file"
+    - index: 1
+      type: "int"
+    selectors:
+    - matchBinaries:
+      - operator: "In"
+        values:
+        - "/usr/lib/jvm/java-1.8-openjdk/jre/bin/java"
+      matchArgs:
+      - index: 0
+        operator: "Prefix"
+        values:
+        - "/tmp"
+      - index: 1
+        operator: "Equal"
+        values:
+        - "2"
+      matchActions:
+      - action: Post

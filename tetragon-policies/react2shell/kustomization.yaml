@@ -1,0 +1,9 @@
+# react2shell 운영 배포 (팀원 최종: 3개 — uv-spawn · process-flow · shell-block)
+# ※ uprobe uv-spawn 은 경로 PID 때문에 ../tetra-sync.sh 로 적용(여기 미포함).
+# ※ 미배포(파일은 보존): shell-observe(=shell-detect, lsm 관찰), lsm-bprmcheck-observe(stage1),
+#    uprobe syncspawn · v8property(연구용).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - react2shell-kprobe-processflow-observe.yaml    # kprobe: clone/clone3/execve 관찰
+  - react2shell-lsm-bprmcheck-shell-block.yaml      # ★ lsm 차단: 셸 실행 종료(Sigkill)

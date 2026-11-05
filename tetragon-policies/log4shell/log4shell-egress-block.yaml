@@ -1,0 +1,29 @@
+# [log4shell / egress / block] 네트워크 아웃바운드 차단 (Cilium)
+# DNS만 허용 → 나머지 나가는 연결 전부 차단 (JNDI 다운로드·리버스셸·유출 원천 차단)
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: log4shell-egress-block
+  namespace: vuln-lab
+  labels:
+    tefal.io/vuln: log4shell
+    tefal.io/layer: egress
+    tefal.io/action: block
+spec:
+  endpointSelector:
+    matchLabels:
+      app: log4shell
+  egress:
+  # DNS 조회 허용 (kube-dns) — 이름 해석이 필요한 정상 동작 유지
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: ANY
+      rules:
+        dns:
+        - matchPattern: "*"
+  # egress 를 하나라도 명시하면 나머지는 기본 거부 → DNS 외 전부 차단
