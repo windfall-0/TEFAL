@@ -18,7 +18,7 @@ router = APIRouter(tags=["ti"])
 
 NEW_LOOKUPS_PER_REQUEST = 10  # 목록 한 번에 새로 외부 조회할 IP 수 (나머지는 캐시만, 다음 새로고침에 채운다)
 ROLE_TEXT = {"src": "출발지", "demo": "출발지 (시연용)", "dst": "외부 연결"}
-DEMO_NOTICE = "시연용 IP입니다. 실제 공격 출발지가 아닙니다 (DEMO_SRC_IP_POOL)"
+DEMO_NOTICE = "시연용 IP · 실제 출발지 아님"  # 선택 IP 상세 Stat 칸이 좁아 짧게
 
 
 def _ti(request: Request) -> TiService:

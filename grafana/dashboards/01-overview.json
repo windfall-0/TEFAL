@@ -292,7 +292,13 @@
                 "value": null
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "처리할 사건 목록 (미차단)",
+              "url": "/d/tefal-overview?${__url_time_range}&${namespace:queryparam}&${runtime:queryparam}&${level:queryparam}&var-status=unblocked&viewPanel=panel-6"
+            }
+          ]
         },
         "overrides": [
           {
@@ -390,7 +396,13 @@
                 "value": null
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "시간대별 사건 그래프",
+              "url": "/d/tefal-overview?${__url_time_range}&${namespace:queryparam}&${runtime:queryparam}&${level:queryparam}&${status:queryparam}&viewPanel=panel-8"
+            }
+          ]
         },
         "overrides": []
       }
@@ -477,7 +489,13 @@
                 "value": null
               }
             ]
-          }
+          },
+          "links": [
+            {
+              "title": "워크로드별 사건 막대그래프",
+              "url": "/d/tefal-overview?${__url_time_range}&${namespace:queryparam}&${runtime:queryparam}&${level:queryparam}&${status:queryparam}&viewPanel=panel-7"
+            }
+          ]
         },
         "overrides": [
           {
@@ -925,7 +943,13 @@
             },
             "inspect": false
           },
-          "noValue": "사건 없음"
+          "noValue": "사건 없음",
+          "links": [
+            {
+              "title": "사건 상세 · Trace View + AI 해석",
+              "url": "/d/tefal-incident?var-trace_id=${__data.fields.trace_id}&from=${__data.fields.window_from_ms}&to=${__data.fields.window_to_ms}"
+            }
+          ]
         },
         "overrides": [
           {
@@ -1103,6 +1127,10 @@
               {
                 "id": "links",
                 "value": [
+                  {
+                    "title": "사건 상세 · Trace View + AI 해석",
+                    "url": "/d/tefal-incident?var-trace_id=${__data.fields.trace_id}&from=${__data.fields.window_from_ms}&to=${__data.fields.window_to_ms}"
+                  },
                   {
                     "title": "위협 인텔리전스에서 보기",
                     "url": "/d/tefal-ti?var-ip=${__data.fields.src_ip}&from=now-24h&to=now"
@@ -1452,7 +1480,7 @@
     {
       "id": 9,
       "type": "table",
-      "title": "정책 상태 · 방어가 제대로 도는가",
+      "title": "정책 상태",
       "description": "정책별 시간 범위 안 히트 수 (Tetragon·Falco 로그 기준, 같은 프로세스의 같은 행위가 1초 안에 반복되면 1건). 구분 = 경고 단계",
       "gridPos": {
         "x": 0,

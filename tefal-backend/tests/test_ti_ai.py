@@ -241,7 +241,7 @@ def test_ti_demo_ips_are_labeled(settings, auth):
             rows = c.get("/ti/ips", params=q, headers=auth).json()
             assert [(r["ip"], r["role"], r["demo"]) for r in rows] == [(PUB, "출발지 (시연용)", True)]
             d = c.get(f"/ti/ip/{PUB}", headers=auth).json()
-            assert d["demo"] is True and "실제 공격 출발지가 아닙니다" in d["notice"]
+            assert d["demo"] is True and d["notice"] == "시연용 IP · 실제 출발지 아님"
             sm = c.get("/ti/summary", params=q, headers=auth).json()
             assert sm["demo_mode"] is True and sm["demo_lookups"] >= 2
 

@@ -206,7 +206,7 @@ def overview():
     b = Builder()
     summary_url = "/incidents/summary?" + INC_Q
 
-    b.add("stat", "조치 필요 · 미차단", 0, 0, 6, 5,
+    p_unblocked = b.add("stat", "조치 필요 · 미차단", 0, 0, 6, 5,
           [inf(summary_url, [("unblocked_count", "미차단", "number"),
                              ("unblocked_last_time", "최근", "string")])],
           DS_B, stat_opts(size=(14, 48)),
@@ -215,13 +215,13 @@ def overview():
           overrides=[ov("최근", color=fixed("text"))],
           desc="Falco만 탐지하고 Tetragon이 차단하지 못한 사건. 바로 조치가 필요합니다.")
 
-    b.add("stat", "차단", 6, 0, 6, 5,
+    p_blocked = b.add("stat", "차단", 6, 0, 6, 5,
           [inf(summary_url, [("blocked_count", "차단 (건)", "number")])],
           DS_B, stat_opts(text="value", size=(14, 48)),
           defaults={"color": fixed(BLUE), "noValue": "0", "thresholds": thresholds((None, BLUE))},
           desc="Tetragon 인라인 차단(Sigkill·Override) 건수. 선택한 시간 범위 기준.")
 
-    b.add("stat", "공격받은 워크로드", 12, 0, 6, 5,
+    p_attacked = b.add("stat", "공격받은 워크로드", 12, 0, 6, 5,
           [inf(summary_url, [("attacked_workloads", "공격받음", "number"),
                              ("total_workloads", "전체 pod", "number")])],
           DS_B, stat_opts(size=(14, 48)),
@@ -266,7 +266,7 @@ def overview():
         ("window_from_ms", "window_from_ms", "number"), ("window_to_ms", "window_to_ms", "number"),
         ("src_ip", "src_ip", "string"),  # 링크용 원래 값 (표시 열에는 '· 시연용'이 붙을 수 있다)
     ]
-    b.add("table", "사건 큐 · trace 1개 = 사건 1건 (미차단 우선 정렬)", 0, 9, 24, 10,
+    p_queue = b.add("table", "사건 큐 · trace 1개 = 사건 1건 (미차단 우선 정렬)", 0, 9, 24, 10,
           [inf("/incidents?" + INC_Q + "&limit=100", queue_cols)],
           DS_B, table_opts(),
           defaults={"custom": {"align": "left", "cellOptions": {"type": "auto"}, "inspect": False},
@@ -293,7 +293,7 @@ def overview():
           ],
           desc="출처: tefal-backend /incidents. 미차단이 먼저, 그다음 최신순. 단계는 Sigma level, 판정 중 = Falco 경보 후 Tetragon 결과 대기.")
 
-    b.add("barchart", "워크로드별 사건 · 패치·격리 우선순위", 0, 19, 12, 8,
+    p_workload = b.add("barchart", "워크로드별 사건 · 패치·격리 우선순위", 0, 19, 12, 8,
           [inf("/incidents/by-workload?" + INC_Q,
                [("pod", "pod", "string"), ("blocked", "차단", "number"), ("unblocked", "미차단", "number")])],
           DS_B,
@@ -306,7 +306,7 @@ def overview():
           overrides=[ov("차단", color=fixed(BLUE)), ov("미차단", color=fixed(RED))],
           desc="미차단이 많은 워크로드부터 패치·격리합니다.")
 
-    b.add("timeseries", "시간대별 사건 (5분 단위)", 12, 19, 12, 8,
+    p_timeline = b.add("timeseries", "시간대별 사건 (5분 단위)", 12, 19, 12, 8,
           [inf("/incidents/timeseries?" + INC_Q + "&interval=5m",
                [("time_ms", "time", "timestamp_epoch"), ("blocked", "차단", "number"),
                 ("unblocked", "미차단", "number")])],
@@ -319,7 +319,7 @@ def overview():
                     "unit": "none", "decimals": 0, "min": 0},
           overrides=[ov("차단", color=fixed(BLUE)), ov("미차단", color=fixed(RED))])
 
-    b.add("table", "정책 상태 · 방어가 제대로 도는가", 0, 27, 24, 9,
+    b.add("table", "정책 상태", 0, 27, 24, 9,
           [inf("/policies/stats?" + TR + "&namespace=${namespace}",
                [("policy", "정책", "string"), ("tag", "구분", "string"), ("layer", "계층", "string"),
                 ("action", "액션", "string"), ("hits", "히트", "number")])],
@@ -330,6 +330,23 @@ def overview():
               ov("히트", custom__width=70, custom__align="right"),
           ],
           desc="정책별 시간 범위 안 히트 수 (Tetragon·Falco 로그 기준, 같은 프로세스의 같은 행위가 1초 안에 반복되면 1건). 구분 = 경고 단계")
+
+    # 상단 숫자를 누르면 관련 패널을 크게 연다 (Grafana 11+ viewPanel=panel-<id>).
+    # 필터 변수와 시간 범위는 그대로 가져간다
+    def view(panel, title, status="${status:queryparam}"):
+        return [{"title": title, "url": "/d/" + UIDS["overview"] + "?${__url_time_range}"
+                 "&${namespace:queryparam}&${runtime:queryparam}&${level:queryparam}&" + status
+                 + f"&viewPanel=panel-{panel['id']}"}]
+    p_unblocked["fieldConfig"]["defaults"]["links"] = view(p_queue, "처리할 사건 목록 (미차단)", "var-status=unblocked")
+    p_blocked["fieldConfig"]["defaults"]["links"] = view(p_timeline, "시간대별 사건 그래프")
+    p_attacked["fieldConfig"]["defaults"]["links"] = view(p_workload, "워크로드별 사건 막대그래프")
+    # 사건 큐: 아무 칸이나 누르면 사건 상세. 출발지 IP·트레이스 칸은 열별 링크가 기본값을 덮으므로 사건 상세를 함께 둔다
+    incident_link = {"title": "사건 상세 · Trace View + AI 해석", "url": INCIDENT_LINK}
+    p_queue["fieldConfig"]["defaults"]["links"] = [incident_link]
+    for o in p_queue["fieldConfig"]["overrides"]:
+        for prop in o["properties"]:
+            if prop["id"] == "links" and incident_link not in prop["value"]:
+                prop["value"] = [incident_link, *prop["value"]]
 
     variables = [
         {"type": "query", "name": "namespace", "label": "namespace", "hide": 0, "datasource": DS_P,
@@ -411,9 +428,10 @@ def incident():
            {"refId": "B", "datasource": DS_L, "expr": '${loki_selector} |= `"exec_id":"${parent_exec_id}"`', "queryType": "range"}],
           DS_L,
           {"showTime": True, "showLabels": False, "showCommonLabels": False, "wrapLogMessage": True,
-           "prettifyLogMessage": False, "enableLogDetails": True, "dedupStrategy": "numbers",
+           "prettifyLogMessage": True, "enableLogDetails": True, "dedupStrategy": "numbers",
            "sortOrder": "Ascending"},
-          desc="출처: Loki · exec_id 와 parent exec_id 로 필터. 숫자(시각 등)만 다른 연속 줄은 한 줄로 접어 반복 횟수를 표시합니다 (중복 제거: Numbers)")
+          desc="출처: Loki · exec_id 와 parent exec_id 로 필터. JSON을 줄바꿈해 보여 줍니다(Prettify JSON). "
+               "숫자(시각 등)만 다른 연속 줄은 한 줄로 접어 반복 횟수를 표시합니다 (중복 제거: Numbers)")
 
     b.add("stat", "출발지 IP 요약", 16, 19, 8, 9,
           [inf("/ti/ip/${src_ip}",

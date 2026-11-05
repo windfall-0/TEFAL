@@ -98,10 +98,14 @@ kube-prometheus-stack의 sidecar를 쓰면 대시보드 ConfigMap에 `grafana_da
 - 상단 링크(운영 현황 · 사건 상세 · 위협 인텔리전스 · 인프라 · Hubble UI ↗ · Headlamp ↗)가 탭 역할을 한다.
 - 사건 큐의 **단계**는 Sigma level(Critical · High · Medium · Low · Info)이다. 상단 필터 `단계`로 거를 수 있다. 매칭 기준은 `BACKEND_API.md` 4.8.
 - 사건 큐의 **상태**는 차단됨 · 미차단 · 판정 중이다. 판정 중은 Falco 경보 뒤 Tetragon 결과를 기다리는 사건이다.
-- 사건 큐의 **AI 분석**을 누르면 ② 사건 상세가 `trace_id`와 사건 시각 ±5분 범위로 열린다.
-- 사건 큐의 **트레이스**를 누르면 Tempo Explore가 열린다.
-- **출발지 IP**를 누르면 ③ 위협 인텔리전스가 해당 IP로 열린다.
-- ②에서 AI를 다시 분석하려면 변수 `AI 다시 분석`을 `예`로 바꾼다. 끝나면 `아니오`로 돌린다.
+- ① 상단 숫자를 누르면 관련 패널이 크게 열린다(필터·시간 범위 유지).
+  - 미차단 → 사건 큐(상태 = 미차단)
+  - 차단 → 시간대별 사건 그래프
+  - 공격받은 워크로드 → 워크로드별 막대그래프
+- 사건 큐에서 **아무 칸이나** 누르면 ② 사건 상세가 `trace_id`와 사건 시각 ±5분 범위로 열린다. **트레이스** 칸도 같다.
+- **출발지 IP** 칸을 누르면 사건 상세와 ③ 위협 인텔리전스(해당 IP) 중에서 고른다. 출발지를 모르면 `확인 불가 (이유)`가 회색으로 보인다.
+- ② Tempo Explore는 Trace View 패널의 링크로 연다.
+- ② AI 해석은 화면을 열 때 저장된 결과만 보여 준다. **[AI 분석 요청]**·**[다시 분석]** 버튼을 눌러야 Gemini를 부른다.
 
 ## 대시보드 수정
 
@@ -117,7 +121,7 @@ PYTHONIOENCODING=utf-8 python grafana/tools/build_dashboards.py grafana/dashboar
 
 - **Trace View 쿼리는 `queryType: "traceql"`에 trace ID만 넣는다.** Grafana 화면(브라우저)의 Tempo 데이터소스는
   `queryType: "traceId"`를 실행하지 않아 패널이 계속 로딩된다. Grafana 서버 API(`/api/ds/query`)는 `traceId`를 받아 주므로
-  서버 쪽 점검만으로는 이 문제가 보이지 않는다. 사건 큐의 "Tempo에서 트레이스 보기" 링크도 같은 이유로 `traceql`이다.
+  서버 쪽 점검만으로는 이 문제가 보이지 않는다. Trace View 패널의 "Tempo Explore에서 열기" 링크도 같은 이유로 `traceql`이다.
 - **Trace View 패널만 조회 범위가 최근 7일로 고정**되어 있다(`timeFrom: 7d`). Grafana는 trace ID 조회에도 대시보드 시간 범위를 붙이는데,
   늦게 기록된 trace(백엔드 재시작·사건 DB 재생성으로 지난 사건을 다시 기록한 경우)는 사건 시각 범위로는 Tempo에서 찾지 못한다.
 - **원본 로그 필터**는 `` |= `"exec_id":"${exec_id}"` ``다. process·parent의 exec_id와 parent_exec_id에 모두 맞고,

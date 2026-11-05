@@ -519,7 +519,7 @@
       "id": 4,
       "type": "logs",
       "title": "원본 로그 · 이 사건에 속한 이벤트",
-      "description": "출처: Loki · exec_id 와 parent exec_id 로 필터. 숫자(시각 등)만 다른 연속 줄은 한 줄로 접어 반복 횟수를 표시합니다 (중복 제거: Numbers)",
+      "description": "출처: Loki · exec_id 와 parent exec_id 로 필터. JSON을 줄바꿈해 보여 줍니다(Prettify JSON). 숫자(시각 등)만 다른 연속 줄은 한 줄로 접어 반복 횟수를 표시합니다 (중복 제거: Numbers)",
       "gridPos": {
         "x": 0,
         "y": 19,
@@ -555,7 +555,7 @@
         "showLabels": false,
         "showCommonLabels": false,
         "wrapLogMessage": true,
-        "prettifyLogMessage": false,
+        "prettifyLogMessage": true,
         "enableLogDetails": true,
         "dedupStrategy": "numbers",
         "sortOrder": "Ascending"
