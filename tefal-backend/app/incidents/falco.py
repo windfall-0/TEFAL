@@ -6,6 +6,7 @@ from app import flow
 from app.config import Settings
 from app.incidents import correlate
 from app.incidents.builder import log_incident
+from app.incidents.falsepos import is_loopback_alert
 from app.incidents.levels import (
     SigmaLevels,
     falco_priority_rank,
@@ -40,6 +41,8 @@ async def ingest_falco(
         return {"ignored": True}
     if falco_priority_rank(priority) < falco_priority_rank(settings.falco_min_priority):
         return {"ignored": True}
+    if settings.falco_ignore_loopback and is_loopback_alert(of):
+        return {"ignored": True, "reason": "loopback"}  # 외부 연결이 아닌 루프백 (falsepos.py)
 
     seen = await store.falco_seen(uuid)
     if seen is not None:  # Falcosidekick 재전송

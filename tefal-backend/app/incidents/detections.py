@@ -15,6 +15,7 @@ import time
 from app.config import Settings
 from app.core.validators import is_public_ip
 from app.incidents import dedup
+from app.incidents.falsepos import is_loopback_alert, loopback_host
 from app.incidents.store import IncidentStore
 from app.incidents.tetragon import parse_event, parse_time_ns
 
@@ -95,6 +96,8 @@ class DetectionCollector:
             if not isinstance(d, dict) or not d.get("rule"):
                 continue
             of = d.get("output_fields") or {}
+            if self.s.falco_ignore_loopback and is_loopback_alert(of):
+                continue  # 루프백 연결 오탐은 탐지 수에 넣지 않는다
             t = parse_time_ns(d.get("time") or "") or loki_ns
             key = dedup.falco_key(str(of.get("k8s.pod.name") or ""), d["rule"],
                                   str(of.get("proc.cmdline") or ""), str(of.get("fd.name") or ""))
@@ -156,20 +159,10 @@ def _falco_remote(of: dict) -> tuple[str | None, int | None]:
         if "->" in name:
             left, right = name.split("->", 1)
             # 출발지가 루프백이면 상대도 자기 자신이다(Apache dummy connection 등). 오른쪽이 깨져 와도 버린다
-            if _loopback(left.rpartition(":")[0]):
+            if loopback_host(left.rpartition(":")[0]):
                 return None, None
             host, _, p = right.rpartition(":")
             ip, port = host, (int(p) if p.isdigit() else None)
     if port == 0:  # 포트 0 = 주소 선택용 UDP connect (패킷 없음)
         return None, None
     return ip, port
-
-
-def _loopback(host: str) -> bool:
-    try:
-        addr = ipaddress.ip_address(host.strip("[]"))
-    except ValueError:
-        return False
-    if isinstance(addr, ipaddress.IPv6Address) and addr.ipv4_mapped:
-        addr = addr.ipv4_mapped
-    return addr.is_loopback or addr.is_unspecified

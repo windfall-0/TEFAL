@@ -118,6 +118,7 @@ Falco ─→ Falcosidekick ─(webhook)────────┼→ tefal-back
 | 규칙 | 내용 | 설정 |
 |---|---|---|
 | 연속 차단 병합 | 같은 부모 exec_id 아래에서 `CORRELATE_MERGE_SEC` 안에 기준점이 또 나오면 새 사건을 만들지 않고 기존 사건에 합친다. 공격자가 명령을 연달아 시도하는 경우다 | 기본 10초 |
+| Falco 루프백 오탐 | 연결 경보(`fd.name` = `a->b`) 중 출발지·상대가 루프백(`::1`, `127.0.0.1`, `::ffff:127.0.0.1`, `::`)이거나 상대 포트가 0인 것. Falco `outbound` 매크로가 IPv6 루프백을 빼지 않아 Apache 기동·dummy connection이 "Outbound Connection"으로 잡힌다. 새 경보는 웹훅(`{"ignored": true, "reason": "loopback"}`)과 탐지 수 수집기에서 버리고, 지난 Falco 단독 사건·탐지 행은 기동 시 한 번 Loki 원본을 다시 읽어 `false_positive="loopback"`을 적는다(state `falco_loopback_fp_v1`, 삭제 없음). 표시된 사건은 사건 목록·요약·흐름·TI 집계에서 빠지고 `GET /incidents/{trace_id}`로만 열린다(`false_positive` 필드) | `FALCO_IGNORE_LOOPBACK` (기본 true) |
 | Falco 선행 경보 | Falco 경보로 `pending` 사건을 만든다. `FALCO_WAIT_SEC` 안에 같은 계보에서 차단 기준점이 오면 그 사건에 합쳐 `blocked`로 바꾼다. 시간이 지나도 차단이 없으면 `unblocked`로 확정한다 | 기본 30초 |
 | 같은 요청 병합 | 같은 Beyla HTTP 요청에 연결된 기준점은 병합 간격을 넘어도 한 사건이다(한 요청 = 한 사건) | |
 | Falco 후행 경보 | 차단 사건이 확정된 뒤 `FALCO_WAIT_SEC` 안에 같은 계보의 경보가 오면 그 사건에 붙인다 | 기본 30초 |
@@ -635,6 +636,7 @@ Hubble Relay `GetFlows`에서 `verdict=DROPPED`이고 출발지나 목적지 pod
 | `DEDUP_GAP_SEC` | `1` | 같은 행위 반복을 탐지 1건(① 히트·단계별 탐지)과 span 1개(② Trace View)로 접는 간격 |
 | `LOKI_TETRAGON_SELECTOR` | `{namespace="kube-system", container="export-stdout"}` | |
 | `FALCO_WEBHOOK_TOKEN` | (선택) | Falcosidekick → 백엔드 인증. 없으면 `/ingest/falco`가 `503` |
+| `FALCO_IGNORE_LOOPBACK` | `true` | 루프백 연결 경보를 오탐으로 보고 뺀다 (4.x Falco 루프백 오탐) |
 | `FALCO_MIN_PRIORITY` | `Warning` | 이보다 낮은 경보는 기준점으로 쓰지 않음 |
 | `CORRELATE_LOOKBACK_SEC` | `60` | 기준점 이전 역조회 범위 |
 | `CORRELATE_MERGE_SEC` | `10` | 연속 차단 병합, 사건 확정 대기 |

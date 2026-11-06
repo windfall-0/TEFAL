@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS incidents (
     beyla_span_id  TEXT,
     updated_ms     INTEGER NOT NULL,
     layers         TEXT NOT NULL DEFAULT '[]',  -- 걸린 계층 합집합: app | proc | lsm | egress | falco (flow.py)
-    layer_policies TEXT NOT NULL DEFAULT '{}'   -- 계층별 처음 걸린 정책·룰 이름
+    layer_policies TEXT NOT NULL DEFAULT '{}',  -- 계층별 처음 걸린 정책·룰 이름
+    false_positive TEXT                         -- 오탐 이유 (NULL = 정상). 화면·집계에서 뺀다 (falsepos.py)
 );
 CREATE INDEX IF NOT EXISTS incidents_start ON incidents(start_ms);
 CREATE INDEX IF NOT EXISTS incidents_merge ON incidents(node, parent_exec_id, last_ms);
@@ -74,7 +75,8 @@ CREATE TABLE IF NOT EXISTS detections (  -- 탐지 1건 = 1초 안 반복을 접
     priority  TEXT,                       -- Falco priority
     first_ns  INTEGER NOT NULL,
     last_ns   INTEGER NOT NULL,
-    count     INTEGER NOT NULL            -- 접힌 원본 줄 수
+    count     INTEGER NOT NULL,           -- 접힌 원본 줄 수
+    false_positive TEXT                   -- 오탐 이유 (NULL = 정상). 탐지 수에서 뺀다
 );
 CREATE INDEX IF NOT EXISTS detections_first ON detections(first_ns);
 CREATE TABLE IF NOT EXISTS remote_ips (  -- 감시 pod가 밖으로 연결한 공인 IP (③ TI 대상, 5.4)
@@ -90,7 +92,7 @@ CREATE TABLE IF NOT EXISTS remote_ips (  -- 감시 pod가 밖으로 연결한 �
 );
 """
 
-COLUMNS = ["trace_id", "start_ms", "anchor_ms", "last_ms", "status", "level", "level_source", "action", "detected_by", "namespace", "pod", "node", "runtime", "runtime_detail", "summary", "mitre", "src_ip", "exec_id", "parent_exec_id", "policy", "container_id", "falco_rules", "falco_ms", "beyla_trace_id", "beyla_link_confidence", "beyla_span_id", "updated_ms", "layers", "layer_policies"]
+COLUMNS = ["trace_id", "start_ms", "anchor_ms", "last_ms", "status", "level", "level_source", "action", "detected_by", "namespace", "pod", "node", "runtime", "runtime_detail", "summary", "mitre", "src_ip", "exec_id", "parent_exec_id", "policy", "container_id", "falco_rules", "falco_ms", "beyla_trace_id", "beyla_link_confidence", "beyla_span_id", "updated_ms", "layers", "layer_policies", "false_positive"]
 _JSON_COLS = {"mitre", "falco_rules", "layers", "layer_policies"}
 
 
@@ -125,6 +127,7 @@ class Incident:
     updated_ms: int = 0
     layers: list[str] = field(default_factory=list)
     layer_policies: dict[str, str] = field(default_factory=dict)
+    false_positive: str | None = None
     member_count: int = 0
 
 
@@ -144,7 +147,8 @@ def _row_to_incident(row: aiosqlite.Row, member_count: int = 0) -> Incident:
 
 
 _ADDED_COLUMNS = {"beyla_trace_id": "TEXT", "beyla_link_confidence": "TEXT", "beyla_span_id": "TEXT",
-                  "layers": "TEXT NOT NULL DEFAULT '[]'", "layer_policies": "TEXT NOT NULL DEFAULT '{}'"}
+                  "layers": "TEXT NOT NULL DEFAULT '[]'", "layer_policies": "TEXT NOT NULL DEFAULT '{}'",
+                  "false_positive": "TEXT"}
 
 
 async def _migrate(conn: aiosqlite.Connection) -> None:
@@ -172,6 +176,9 @@ class IncidentStore:
         await conn.executescript(_SCHEMA.split("CREATE INDEX")[0])
         await _migrate(conn)
         await conn.executescript(_SCHEMA)
+        async with conn.execute("PRAGMA table_info(detections)") as cur:
+            if "false_positive" not in {r[1] for r in await cur.fetchall()}:
+                await conn.execute("ALTER TABLE detections ADD COLUMN false_positive TEXT")
         await conn.commit()
         return cls(conn)
 
@@ -306,7 +313,7 @@ class IncidentStore:
         cond = "i.detected_by='falco'" if falco_only else "i.detected_by!='falco'"
         async with self._conn.execute(
             f"SELECT DISTINCT i.* FROM incidents i JOIN members m ON m.trace_id=i.trace_id "
-            f"WHERE substr(i.container_id,1,12)=? AND m.pid IN ({marks}) AND {cond} "
+            f"WHERE substr(i.container_id,1,12)=? AND m.pid IN ({marks}) AND {cond} AND i.false_positive IS NULL "
             f"AND i.anchor_ms BETWEEN ? AND ? ORDER BY i.anchor_ms LIMIT 1",
             (container_id[:12], *sorted(pids), lo_ms, hi_ms),
         ) as cur:
@@ -329,7 +336,7 @@ class IncidentStore:
 
     async def detection_counts(self, from_ns: int, to_ns: int, namespace: str | None) -> dict:
         """시간 범위 안에서 시작한 탐지 수: {"tetragon": {정책: n}, "falco": {룰: n}, "falco_priority": {룰: p}}."""
-        where, args = ["first_ns BETWEEN ? AND ?"], [from_ns, to_ns]
+        where, args = ["first_ns BETWEEN ? AND ?", "false_positive IS NULL"], [from_ns, to_ns]
         if namespace:
             where.append("namespace = ?")
             args.append(namespace)
@@ -343,6 +350,17 @@ class IncidentStore:
                 if source == "falco" and prio:
                     out["falco_priority"][name] = prio
         return out
+
+    async def falco_detections(self) -> list[dict]:
+        """오탐 판정 전 Falco 탐지 행 (지난 데이터 오탐 표시용)."""
+        async with self._conn.execute(
+            "SELECT rowid, name, namespace, first_ns, last_ns FROM detections "
+            "WHERE source='falco' AND false_positive IS NULL ORDER BY first_ns"
+        ) as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+    async def mark_detection_fp(self, rowid: int, reason: str) -> None:
+        await self._conn.execute("UPDATE detections SET false_positive=? WHERE rowid=?", (reason, rowid))
 
     async def prune_detections(self, before_ns: int) -> None:
         await self._conn.execute("DELETE FROM detections WHERE first_ns < ?", (before_ns,))
@@ -376,8 +394,10 @@ class IncidentStore:
         ) as cur:
             return {r[0]: r[1] for r in await cur.fetchall()}
 
-    async def query(self, f: CommonFilters, limit: int | None = None) -> list[Incident]:
+    async def query(self, f: CommonFilters, limit: int | None = None, include_fp: bool = False) -> list[Incident]:
         where, args = ["start_ms BETWEEN ? AND ?"], [f.from_ms, f.to_ms]
+        if not include_fp:
+            where.append("false_positive IS NULL")  # 오탐 표시된 사건은 화면·집계에서 뺀다
         if f.namespace:
             where.append("namespace=?")
             args.append(f.namespace)

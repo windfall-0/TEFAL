@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     # Falco (Falcosidekick webhook)
     falco_webhook_token: SecretStr | None = None  # 없으면 /ingest/falco는 503
     falco_min_priority: str = "Warning"
+    falco_ignore_loopback: bool = True  # 루프백 연결 경보(Apache dummy connection 등)는 오탐으로 보고 뺀다 (falsepos.py)
     dedup_gap_sec: float = 1.0  # 같은 행위 반복을 1건으로 접는 간격 (dedup.py)
     falco_wait_sec: int = 30
 

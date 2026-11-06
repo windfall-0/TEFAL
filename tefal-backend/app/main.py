@@ -22,6 +22,7 @@ from app.hubble.client import HubbleClient
 from app.incidents.collector import Collector, LokiClient
 from app.incidents.detections import DetectionCollector
 from app.incidents.events import backfill_layers, backfill_mitre
+from app.incidents.falsepos import backfill_false_positives
 from app.incidents.levels import SigmaLevels
 from app.incidents.store import IncidentStore
 from app.incidents.tempo import TempoClient
@@ -77,10 +78,13 @@ async def lifespan(app: FastAPI):
         # ① 계층별 방어 흐름: 지난 사건의 계층을 한 번 채운다 (사건 DB는 다시 만들지 않는다)
         app.state.backfill = asyncio.create_task(
             backfill_layers(app.state.incidents, loki, settings, app.state.incidents_lock), name="layers-backfill")
+        # Falco 루프백 오탐: 지난 사건·탐지에 표시만 한다 (지우지 않는다)
+        app.state.fp_backfill = asyncio.create_task(
+            backfill_false_positives(app.state.incidents, loki, settings, app.state.incidents_lock), name="fp-backfill")
     try:
         yield
     finally:
-        for t in (task, getattr(app.state, "backfill", None)):
+        for t in (task, getattr(app.state, "backfill", None), getattr(app.state, "fp_backfill", None)):
             if t is not None:
                 t.cancel()
                 with contextlib.suppress(asyncio.CancelledError, Exception):

@@ -85,6 +85,7 @@ def to_model(inc: Incident, tz: str, demo_pool: list[str] | None = None) -> dict
         "status_text": f"{STATUS_LABEL[inc.status]} · {inc.action}",
         "time_text": f"{fmt_hms(inc.start_ms, tz)}.{frac}",
         "mitre_text": " · ".join(inc.mitre) if inc.mitre else "-",
+        "false_positive": inc.false_positive,  # 오탐 표시 (목록·집계에서는 빠지고 trace_id로만 열린다)
         "window_from_ms": inc.start_ms - WINDOW_MS,
         "window_to_ms": max(ms, inc.last_ms) + WINDOW_MS,
     }

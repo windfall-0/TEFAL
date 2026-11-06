@@ -103,6 +103,18 @@ kubectl rollout restart deploy/tefal-backend -n monitoring
 백엔드가 1분 안팎으로 다시 읽는다. **이미 만든 사건의 단계는 바뀌지 않는다** → 아래 "사건 DB 다시 만들기".
 같은 표의 `mitre` 필드(사건 큐 MITRE 열)도 새 사건부터 적용된다. 지난 사건 중 MITRE가 비어 있던 것은 처음 기동할 때 한 번 채운다(`mitre_backfill_v1`).
 
+### Falco 루프백 오탐 표시 되돌리기
+
+루프백 연결 경보(Apache dummy connection 등)는 기동 시 `false_positive="loopback"`으로 표시되어 화면·집계에서 빠진다(지우지 않음).
+되돌리려면 표시를 지우고 상태 키를 지운 뒤 `FALCO_IGNORE_LOOPBACK=false`로 재시작한다:
+
+```bash
+kubectl exec -n monitoring deploy/tefal-backend -c tefal-backend -- /deps/venv/bin/python -c "
+import sqlite3; c=sqlite3.connect('/data/tefal.db')
+c.execute(\"UPDATE incidents SET false_positive=NULL\"); c.execute(\"UPDATE detections SET false_positive=NULL\")
+c.execute(\"DELETE FROM state WHERE key='falco_loopback_fp_v1'\"); c.commit()"
+```
+
 ### 사건 DB 다시 만들기
 
 사건은 Loki 로그에서 다시 만들 수 있는 파생 데이터다. 묶기 규칙이나 단계 표를 바꾼 뒤 지난 사건에도 적용할 때 쓴다.
