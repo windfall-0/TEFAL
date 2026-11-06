@@ -665,7 +665,7 @@ Hubble Relay `GetFlows`에서 `verdict=DROPPED`이고 출발지나 목적지 pod
 | `CACHE_DB` | `sqlite:////data/tefal.db` | 또는 `redis://...` |
 | `WATCH_NAMESPACES` | `vuln-lab` | |
 | `SIGMA_LEVELS_FILE` | `/config/sigma_levels.yaml` | 경고 단계 매칭 표 (4.8) |
-| `DEMO_SRC_IP_POOL` | (빈 값 = 꺼짐) | 시연 모드. 쉼표로 구분한 공인 IP. 사건 응답의 내부 `src_ip`를 이 중 하나로 바꿔 보여 준다. 사건(trace_id)마다 고르고, 같은 사건은 항상 같은 값이다. 배포값은 공개 스캔을 하는 연구·스캐너 기관 IP 12개(Censys, Shodan, Driftnet, Shadowserver, internet-census.org, ONYPHE. 역방향 DNS로 확인)와 중국 IP 3개다. 중국은 스캐너 기관으로 확인되는 IP가 없어 AbuseIPDB 블랙리스트(신뢰도 100)의 클라우드·IDC 대역에서 골랐다. 원래 값은 `src_ip_original`, 바뀌었는지는 `src_ip_demo`. DB·Loki·Tempo는 원본 그대로 |
+| `DEMO_SRC_IP_POOL` | (빈 값 = 꺼짐) | 시연 모드. 쉼표로 구분한 공인 IP. 사건 응답의 내부 `src_ip`를 이 중 하나로 바꿔 보여 준다. 사건(trace_id)마다 고르고, 같은 사건은 항상 같은 값이다. 배포값은 공개 스캔을 하는 연구·스캐너 기관 IP 12개(Censys, Shodan, Driftnet, Shadowserver, internet-census.org, ONYPHE. 역방향 DNS로 확인), 중국 IP 3개, 그 밖의 30개(총 45개)다. 중국 3개와 추가 30개는 AbuseIPDB 블랙리스트(신뢰도 100)의 클라우드·호스팅 대역에서 나라가 겹치지 않게 골랐다(2026-11-06). 원래 값은 `src_ip_original`, 바뀌었는지는 `src_ip_demo`. DB·Loki·Tempo는 원본 그대로 |
 
 API 키는 K8s `Secret`으로 주입한다. 이미지와 ConfigMap에 넣지 않는다.
 

@@ -123,6 +123,11 @@ def test_remote_ip_extraction():
     from app.incidents.detections import _falco_remote, _public
     assert _public("::ffff:8.8.8.8") == "8.8.8.8" and _public("::ffff:192.168.0.157") is None
     assert _falco_remote({"fd.name": "10.233.64.21:46092->8.8.8.8:443"}) == ("8.8.8.8", 443)
+    # Apache 루프백(dummy connection·주소 선택용 UDP connect)은 외부 연결이 아니다
+    for name in ("::1:51661->::1:80", "::ffff:127.0.0.1:57650->::a070:d993:7770:0:0",
+                 ":::0->::1:0", "10.233.64.21:1->8.8.8.8:0"):
+        assert _falco_remote({"fd.name": name}) == (None, None), name
+    assert _public("::a070:d993:7770:0") is None
     assert _falco_remote({"fd.rip": "1.1.1.1", "fd.rport": 53}) == ("1.1.1.1", 53)
 
 
@@ -298,6 +303,7 @@ async def test_ipinfo_with_and_without_token(settings, tmp_path):
             route = m.get(IPINFO_URL.format(ip=PUB)).mock(return_value=httpx.Response(200, json={}))
             r = await no_token.lookup(PUB)
         assert route.call_count == 0 and r["hostname"] is None and r["place_text"] == "Mountain View"
+        assert r["hostname_text"] is None  # 토큰 없음 → 패널의 '토큰 추가 전' 문구
 
         s = _keys(settings).model_copy(update={"ipinfo_token": SecretStr("t" * 14)})
         ti = TiService(s, cache, http, FakeGeo())
@@ -311,6 +317,16 @@ async def test_ipinfo_with_and_without_token(settings, tmp_path):
         assert route.call_count == 1 and route.calls[0].request.headers["Authorization"] == "Bearer " + "t" * 14
         assert r["hostname"] == "dns.google" and r["org"] == "AS15169 Google LLC"
         assert r["place_text"] == "Mountain View, California" and r["timezone"] == "America/Los_Angeles"
+        assert r["hostname_text"] == "dns.google"
+        # 역방향 DNS가 없는 IP: 토큰이 있으면 '토큰 추가 전'이 아니라 '—'
+        other = "1.1.1.1"
+        with respx.mock(assert_all_called=False) as m:
+            _mock_ti(m)
+            m.get(f"https://www.virustotal.com/api/v3/ip_addresses/{other}").mock(return_value=httpx.Response(404))
+            m.get(IPINFO_URL.format(ip=other)).mock(return_value=httpx.Response(200, json={
+                "ip": other, "city": "Sydney", "org": "AS13335 Cloudflare", "timezone": "Australia/Sydney"}))
+            r2 = await ti.lookup(other)
+        assert r2["hostname_text"] == "— (역방향 DNS 없음)" and r2["org_text"] == "AS13335 Cloudflare"
         u = await ti.usage()
-        assert u["ipinfo_used"] == 1 and u["ipinfo_enabled"] is True
+        assert u["ipinfo_used"] == 2 and u["ipinfo_enabled"] is True  # PUB 1번(캐시) + 1.1.1.1
     await cache.close()

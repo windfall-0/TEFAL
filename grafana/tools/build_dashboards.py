@@ -481,7 +481,7 @@ def incident():
 
     b.add("stat", "출발지 IP 요약", 16, 19, 8, 9,
           [inf("/ti/ip/${src_ip}",
-               [("ip", "IP", "string"), ("hostname", "호스트", "string"), ("country_asn", "국가 / ASN", "string"),
+               [("ip", "IP", "string"), ("hostname_text", "호스트", "string"), ("country_asn", "국가 / ASN", "string"),
                 ("abuse_score", "AbuseIPDB 점수", "number"), ("vt_text", "VirusTotal", "string"),
                 ("notice", "안내", "string")])],
           DS_B, {**stat_opts(fields="/.*/", size=(12, 18)), "orientation": "horizontal"},
@@ -603,8 +603,8 @@ def threat_intel():
           overrides=[ov("악성", color=fixed(RED)), ov("의심", color=fixed(ORANGE))])
 
     b.add("stat", "IP 정보 · ipinfo.io", 0, 29, 24, 4,
-          [inf(ip_url, [("hostname", "호스트 이름", "string"), ("place_text", "도시 / 지역", "string"),
-                        ("org", "조직", "string"), ("timezone", "시간대", "string")])],
+          [inf(ip_url, [("hostname_text", "호스트 이름", "string"), ("place_text", "도시 / 지역", "string"),
+                        ("org_text", "조직", "string"), ("timezone_text", "시간대", "string")])],
           DS_B, stat_opts(fields="/.*/", size=(11, 16)),
           defaults={"color": fixed("text"), "noValue": "ipinfo 토큰 추가 전 (IPINFO_TOKEN)",
                     "thresholds": thresholds((None, "text"))},

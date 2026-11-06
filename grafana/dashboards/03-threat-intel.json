@@ -1469,7 +1469,7 @@
           "root_selector": "",
           "columns": [
             {
-              "selector": "hostname",
+              "selector": "hostname_text",
               "text": "호스트 이름",
               "type": "string"
             },
@@ -1479,12 +1479,12 @@
               "type": "string"
             },
             {
-              "selector": "org",
+              "selector": "org_text",
               "text": "조직",
               "type": "string"
             },
             {
-              "selector": "timezone",
+              "selector": "timezone_text",
               "text": "시간대",
               "type": "string"
             }

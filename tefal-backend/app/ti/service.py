@@ -63,6 +63,13 @@ def _ago(iso: str | None) -> str | None:
     return f"{sec // 86400}일 전"
 
 
+def _ipinfo_text(d: dict, enabled: bool) -> dict:
+    if not enabled:
+        return {"hostname_text": None, "org_text": None, "timezone_text": None}
+    host = d.get("hostname") or ("— (역방향 DNS 없음)" if d else "—")
+    return {"hostname_text": host, "org_text": d.get("org") or "—", "timezone_text": d.get("timezone") or "—"}
+
+
 class TiService:
     def __init__(self, settings: Settings, cache: SqliteCache, http: httpx.AsyncClient, geo: GeoIP) -> None:
         self.s = settings
@@ -224,4 +231,6 @@ class TiService:
             "org": ipinfo.get("org"),
             "timezone": ipinfo.get("timezone"),
             "place_text": ", ".join(x for x in (ipinfo.get("city") or geo.city, ipinfo.get("region")) if x) or None,
+            # 화면용: 토큰이 있으면 빈 값을 '—'로 채운다 (토큰이 없을 때만 패널의 '토큰 추가 전' 문구가 보이게)
+            **_ipinfo_text(ipinfo, self.s.ipinfo_token is not None),
         }

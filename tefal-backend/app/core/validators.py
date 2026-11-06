@@ -23,6 +23,7 @@ _NON_PUBLIC_NETS = [
         "fc00::/7",  # IPv6 ULA
         "fe80::/10",  # IPv6 링크로컬
         "::1/128",
+        "::/8",  # IPv6 예약 대역. Falco가 루프백 연결을 깨진 주소(::a070:...)로 줄 때가 있다
     )
 ]
 
@@ -49,7 +50,7 @@ def is_public_ip(ip: IPAddress) -> bool:
         ip = ip.ipv4_mapped
     if any(ip in net for net in _NON_PUBLIC_NETS if net.version == ip.version):
         return False
-    return ip.is_global and not ip.is_multicast
+    return ip.is_global and not ip.is_multicast and not ip.is_reserved
 
 
 def is_valid_k8s_name(value: str) -> bool:

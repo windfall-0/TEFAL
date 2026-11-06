@@ -635,7 +635,7 @@
               "type": "string"
             },
             {
-              "selector": "hostname",
+              "selector": "hostname_text",
               "text": "호스트",
               "type": "string"
             },

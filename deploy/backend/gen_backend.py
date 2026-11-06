@@ -90,7 +90,7 @@ deploy = {
                             # DB·Loki·Tempo는 원본. 화면에는 '시연용'이 붙는다. 끄려면 빈 문자열.
                             # 공개적으로 인터넷 스캔을 하는 연구·스캐너 기관 IP만 쓴다(역방향 DNS로 확인, 2026-11-04):
                             #   Censys(US) · Shodan(US·IS·NL) · Driftnet/internet-measurement(GB) · Shadowserver(US)
-                            #   · internet-census.org(PT) · ONYPHE(FR 기관, US 위치) · 중국 3개(아래 설명)
+                            #   · internet-census.org(PT) · ONYPHE(FR 기관, US 위치) · 중국 3개 · 블랙리스트 30개(아래 설명)
                             {"name": "DEMO_SRC_IP_POOL",
                              "value": ",".join([
                                  "162.142.125.10", "167.94.138.35",                 # Censys
@@ -105,7 +105,36 @@ deploy = {
                                  # 2026-11-04 신고)의 클라우드·IDC 대역에서 골랐다. 실제 공격 신고가 쌓인 IP다
                                  "118.145.148.31",                                  # Volcano Engine (CN)
                                  "114.67.232.93",                                   # China Unicom Beijing (CN)
-                                 "219.144.80.143"])},                               # Chinanet Shaanxi Cloud Base (CN)
+                                 "219.144.80.143",                                  # Chinanet Shaanxi Cloud Base (CN)
+                                 # 추가 30개: AbuseIPDB 블랙리스트(신뢰도 100, 2026-11-06 조회)에서 클라우드·호스팅 대역,
+                                 # GeoLite 위치가 있는 것만 나라가 겹치지 않게 골랐다. 실제 공격 신고가 쌓인 IP다
+                                 "104.248.183.254",                                 # DigitalOcean (US)
+                                 "118.113.40.21",                                   # Chinanet Chengdu (CN)
+                                 "35.210.55.156",                                   # Google (BE)
+                                 "54.251.44.16",                                    # Amazon (SG)
+                                 "165.154.52.132",                                  # UCloud Seoul (KR)
+                                 "47.91.77.132", "45.135.193.198",                  # Alibaba · Pfcloud (DE)
+                                 "157.245.69.32", "168.100.10.218",                 # DigitalOcean · BL Networks (NL)
+                                 "62.169.23.62", "92.205.109.198",                  # Contabo · Host Europe (FR)
+                                 "152.32.225.99",                                   # UCloud (HK)
+                                 "8.216.12.44",                                     # Alibaba Tokyo (JP)
+                                 "159.65.155.146",                                  # DigitalOcean Bengaluru (IN)
+                                 "34.39.191.32",                                    # Google São Paulo (BR)
+                                 "34.152.40.38",                                    # Google Montreal (CA)
+                                 "43.133.131.35",                                   # Tencent Jakarta (ID)
+                                 "34.81.218.141",                                   # Google Taipei (TW)
+                                 "158.23.22.8",                                     # Microsoft Querétaro (MX)
+                                 "94.244.19.27",                                    # Ukrdatakom Kyiv (UA)
+                                 "62.60.134.142",                                   # KOI Cloud Tehran (IR)
+                                 "165.154.120.226",                                 # UCloud Bangkok (TH)
+                                 "65.21.159.44",                                    # Hetzner Helsinki (FI)
+                                 "37.120.213.13",                                   # M247 Zurich (CH)
+                                 "31.58.236.217",                                   # Rowenix Bursa (TR)
+                                 "152.32.141.28",                                   # UCloud Lagos (NG)
+                                 "158.158.34.156",                                  # Microsoft Madrid (ES)
+                                 "20.46.43.126",                                    # Microsoft Dubai (AE)
+                                 "34.116.152.39",                                   # Google Warsaw (PL)
+                                 "159.112.138.47"])},                               # Oracle Santiago (CL)
                             # 5단계 AI 해석 (키는 Secret tefal-backend-token의 GEMINI_API_KEY)
                             {"name": "GEMINI_MODEL", "value": "gemini-3.5-flash-lite"},
                             {"name": "CACHE_DB", "value": "sqlite:////data/tefal.db"}],
