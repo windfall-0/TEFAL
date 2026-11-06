@@ -75,3 +75,4 @@ def merge_into(dst: Incident, src: Incident) -> None:
     dst.layers = [x for x in LAYERS if x in {*dst.layers, *src.layers}]
     for k, v in src.layer_policies.items():
         dst.layer_policies.setdefault(k, v)
+    dst.mitre = [*dst.mitre, *(m for m in src.mitre if m not in dst.mitre)]  # MITRE도 함께

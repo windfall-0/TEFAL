@@ -22,7 +22,7 @@ Grafana는 **Infinity 데이터소스**(`yesoreyeram-infinity-datasource`)로 �
 - 노드 CPU/메모리, 노드·pod 수, 수집 상태 → Prometheus
 
 **원칙**
-- 조회 전용이다. 격리·재시작 같은 클러스터 조작 API는 만들지 않는다(조작은 Headlamp가 맡는다).
+- 조회 전용이다. 격리·재시작 같은 클러스터 조작 API는 만들지 않는다(조작은 kubectl로 한다).
 - K8s 접근은 `get/list/watch` 권한만 가진 ServiceAccount로 한다.
 
 ---
@@ -183,7 +183,10 @@ Falco ─→ Falcosidekick ─(webhook)────────┼→ tefal-back
 }
 ```
 
-- `summary`, `mitre`: 정책 이름·훅·바이너리 조합으로 만드는 규칙 표(`summary_rules.yaml`)에서 고른다. 맞는 규칙이 없으면 기준점의 `binary + arguments`를 그대로 쓴다.
+- `summary`: 정책 이름·훅·바이너리 조합으로 만든다. 맞는 규칙이 없으면 기준점의 `binary + arguments`를 그대로 쓴다.
+- `mitre`: MITRE ATT&CK 기법 ID. 매칭 표 `sigma_levels.yaml`의 `mitre` 필드로 사건에 걸린 Tetragon 정책들의 기법을 합친다.
+  Falco 경보는 tags의 T 번호(Falco 기본 룰)를 먼저 쓰고, 태그가 없으면 표의 `falco:` 절(커스텀 룰)을 쓴다. 맞는 것이 없으면 `[]`, `mitre_text`는 `-`.
+  표를 고친 뒤 새 사건에는 바로 반영된다. 비어 있던 지난 사건은 기동 시 한 번 채운다(state `mitre_backfill_v1`). 이미 값이 있는 사건과 Tempo span의 `tefal.mitre`는 바뀌지 않는다.
 - `src_ip`: Beyla span의 `client.address`를 우선 쓴다. 없으면 Falco 경보의 `fd.rip`을 쓴다.
 
 ### 4.8 경고 단계 (Sigma level)

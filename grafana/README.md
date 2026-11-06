@@ -88,14 +88,13 @@ kube-prometheus-stack의 sidecar를 쓰면 대시보드 ConfigMap에 `grafana_da
 | `datasources.yaml` | Prometheus `url` | `http://kube-prometheus-stack-prometheus.monitoring:9090` |
 | 모든 대시보드 · 데이터소스 uid | Loki, Tempo | `P8E80F9AEF21F6940`, `tempo-ds` (실제 환경 값) |
 | 모든 대시보드 · 상수 변수 | `hubble_url` | `http://192.168.0.200:31235`. Cilium Helm 값은 건드리지 않고 별도 Service `kube-system/hubble-ui-nodeport`(NodePort 31235)로 노출했다. 인증이 없으니 내부망에서만 쓴다 |
-| 모든 대시보드 · 상수 변수 | `headlamp_url` | `http://192.168.0.200:31240`. Helm `headlamp/headlamp`(ns `headlamp`, worker2 고정). 차트 기본 cluster-admin 바인딩은 끄고 로그인은 `headlamp/tefal-operator` 토큰으로 한다. 권한: 클러스터 namespaces·nodes 조회, `vuln-lab` 조회(secret 제외) + pod 삭제·patch, deployment patch(재시작), NetworkPolicy·CiliumNetworkPolicy 편집 |
 | `02-incident.json` · 상수 변수 | `loki_selector` | `{namespace="kube-system", container="export-stdout"}` |
 | `04-infra.json` · 상수 변수 | `watch_ns` | `vuln-lab` |
 | `01-overview.json` · 수집 상태 패널 | DaemonSet·job 이름 정규식 | `.*tetragon.*`, `.*falco.*`, `.*(alloy\|loki\|tempo).*` |
 
 ## 대시보드 사이 이동
 
-- 상단 링크(운영 현황 · 사건 상세 · 위협 인텔리전스 · 인프라 · Hubble UI ↗ · Headlamp ↗)가 탭 역할을 한다.
+- 상단 링크(운영 현황 · 사건 상세 · 위협 인텔리전스 · 인프라 · Hubble UI ↗)가 탭 역할을 한다.
 - 사건 큐의 **단계**는 Sigma level(Critical · High · Medium · Low · Info)이다. 상단 필터 `단계`로 거를 수 있다. 매칭 기준은 `BACKEND_API.md` 4.8.
 - 사건 큐의 **상태**는 차단됨 · 미차단 · 판정 중이다. 판정 중은 Falco 경보 뒤 Tetragon 결과를 기다리는 사건이다.
 - ① 맨 위 **계층별 방어 흐름**: 서비스 줄을 누르면 그 서비스로, Falco 탐지 줄은 미차단으로 걸러지고, 오른쪽 최근 공격을 누르면 사건 상세로 간다.

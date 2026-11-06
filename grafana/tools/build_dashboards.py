@@ -113,7 +113,7 @@ def nav_links():
                       "url": "/d/" + UIDS[key] + ("?from=now-24h&to=now" if incident else ""),
                       "icon": "dashboard", "keepTime": not incident, "includeVars": False,
                       "targetBlank": False, "asDropdown": False, "tags": [], "tooltip": ""})
-    for title, var in [("Hubble UI", "hubble_url"), ("Headlamp", "headlamp_url")]:
+    for title, var in [("Hubble UI", "hubble_url")]:
         links.append({"title": title, "type": "link", "url": "${" + var + "}",
                       "icon": "external link", "keepTime": False, "includeVars": False,
                       "targetBlank": True, "asDropdown": False, "tags": [], "tooltip": ""})
@@ -164,7 +164,6 @@ def inf_var(name, url, selector):
 COMMON_VARS = [
     # 192.168.0.200 클러스터 NodePort (deploy/README.md). 인증 없는 Hubble UI는 내부망에서만 쓴다
     const("hubble_url", "http://192.168.0.200:31235", "Hubble UI URL"),
-    const("headlamp_url", "http://192.168.0.200:31240", "Headlamp URL"),
 ]
 
 
@@ -311,7 +310,7 @@ def overview():
               ov("상태", custom__width=90, mappings=[STATUS_MAP],
                  custom__cellOptions={"type": "color-background", "mode": "basic"}),
               ov("런타임", custom__width=80),
-              ov("MITRE", custom__width=110),
+              ov("MITRE", custom__width=170),
               ov("출발지 IP", custom__width=190, color=fixed(BLUE),
                  custom__cellOptions={"type": "color-text"},
                  # 출발지를 모르면 '확인 불가 (이유)'가 온다 → 회색
@@ -716,7 +715,7 @@ def infra():
                         mappings=[{"type": "regex", "options": {"pattern": "^(\\d+)/\\1$", "result": {"color": GREEN, "index": 0}}},
                                   {"type": "regex", "options": {"pattern": ".*", "result": {"color": RED, "index": 1}}}])])
 
-    b.add("table", "네트워크 · 정책에 막힌 흐름 (Hubble)", 0, 21, 12, 7,
+    b.add("table", "네트워크 · 정책에 막힌 흐름 (Hubble)", 0, 21, 24, 7,
           [inf("/network/drops?" + TR + "&namespace=${watch_ns}&limit=20",
                [("time_ms", "마지막", "timestamp_epoch"), ("src_pod", "출발", "string"), ("dst", "목적지", "string"),
                 ("reason", "사유", "string"), ("policy", "정책", "string"), ("count", "횟수", "number")])],
@@ -729,14 +728,6 @@ def infra():
           desc="Hubble Relay GetFlows 에서 verdict=DROPPED 이고 감시 namespace pod 가 출발지나 목적지인 흐름. "
                "같은 출발→목적지·사유는 합쳐서 셉니다. 각 노드 Hubble 링 버퍼에 남은 흐름만 보이므로 오래된 구간은 비어 있을 수 있습니다")
 
-    b.add("text", "관리 도구", 12, 21, 12, 7, [], None,
-          {"mode": "html", "content":
-           '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">'
-           '<a href="${hubble_url}" target="_blank" style="border:1px solid #5794F2;border-radius:4px;padding:6px 12px;color:#5794F2">Hubble UI · 서비스 맵 ↗</a>'
-           '<a href="${headlamp_url}" target="_blank" style="border:1px solid #5794F2;border-radius:4px;padding:6px 12px;color:#5794F2">Headlamp · 격리·재시작 ↗</a>'
-           '</div>'
-           '<p style="opacity:0.75">Grafana는 조회 전용입니다. 조작은 별도 로그인과 최소 권한이 걸린 Headlamp에서만 합니다.</p>'})
-    b.panels[-1].pop("datasource"); b.panels[-1].pop("targets")
 
     variables = [const("watch_ns", "vuln-lab", "감시 namespace")]
     return dashboard("infra", "인프라", b, variables, refresh="30s",

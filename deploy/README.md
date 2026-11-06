@@ -101,6 +101,7 @@ kubectl rollout restart deploy/tefal-backend -n monitoring
 
 `tefal-backend/config/sigma_levels.yaml`을 고치고 생성기를 다시 돌린 뒤 `kubectl apply -f 15-sigma-configmap.json`.
 백엔드가 1분 안팎으로 다시 읽는다. **이미 만든 사건의 단계는 바뀌지 않는다** → 아래 "사건 DB 다시 만들기".
+같은 표의 `mitre` 필드(사건 큐 MITRE 열)도 새 사건부터 적용된다. 지난 사건 중 MITRE가 비어 있던 것은 처음 기동할 때 한 번 채운다(`mitre_backfill_v1`).
 
 ### 사건 DB 다시 만들기
 

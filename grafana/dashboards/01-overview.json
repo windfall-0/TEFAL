@@ -84,18 +84,6 @@
       "asDropdown": false,
       "tags": [],
       "tooltip": ""
-    },
-    {
-      "title": "Headlamp",
-      "type": "link",
-      "url": "${headlamp_url}",
-      "icon": "external link",
-      "keepTime": false,
-      "includeVars": false,
-      "targetBlank": true,
-      "asDropdown": false,
-      "tags": [],
-      "tooltip": ""
     }
   ],
   "templating": {
@@ -187,18 +175,6 @@
         "current": {
           "text": "http://192.168.0.200:31235",
           "value": "http://192.168.0.200:31235"
-        },
-        "options": []
-      },
-      {
-        "type": "constant",
-        "name": "headlamp_url",
-        "label": "Headlamp URL",
-        "hide": 2,
-        "query": "http://192.168.0.200:31240",
-        "current": {
-          "text": "http://192.168.0.200:31240",
-          "value": "http://192.168.0.200:31240"
         },
         "options": []
       }
@@ -1082,7 +1058,7 @@
             "properties": [
               {
                 "id": "custom.width",
-                "value": 110
+                "value": 170
               }
             ]
           },

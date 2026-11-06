@@ -5,35 +5,51 @@
 #   - 차단(enforce) 정책: 발동 = RCE가 실제로 저지됨 → critical
 #   - 관측(observe) 정책: 신호 정확도로 결정. 명확한 공격 행위 high / 정황·전조 medium / 광범위 관측 low
 #
+# mitre = MITRE ATT&CK 기법 ID (사건 큐 MITRE 열). 사건에 걸린 정책·규칙의 기법을 합친다.
 # 키 = Tetragon policy_name, Falco rule. 표에 없는 룰은 기본값(Tetragon informational, Falco는 priority 기준).
 # 파일이 바뀌면 백엔드가 다시 읽는다. 이미 만든 사건의 단계는 바뀌지 않는다.
 
 tetragon:
   # ── critical: 능동 차단 (LSM bprm_check_security Override -1)
-  php2shell-lsm-bprmcheck-block:          { level: critical, sigma: "php2shell · LSM · apache → 셸 실행 거부" }
-  log4shell-lsm-bprmcheck-block:          { level: critical, sigma: "log4shell · LSM · JVM → 비java 실행 거부" }
-  react2shell-lsm-bprmcheck-shell-block:  { level: critical, sigma: "react2shell · LSM · node → 셸 실행 거부" }
+  php2shell-lsm-bprmcheck-block:          { level: critical, sigma: "php2shell · LSM · apache → 셸 실행 거부", mitre: [T1190, T1505.003, T1059.004] }
+  log4shell-lsm-bprmcheck-block:          { level: critical, sigma: "log4shell · LSM · JVM → 비java 실행 거부", mitre: [T1190, T1059.004] }
+  react2shell-lsm-bprmcheck-shell-block:  { level: critical, sigma: "react2shell · LSM · node → 셸 실행 거부", mitre: [T1190, T1059.004] }
 
   # ── high: 고정밀 공격 행위 탐지
-  php2shell-uprobe-zifsystem-observe:     { level: high, sigma: "php2shell · uprobe · zif_system/php_exec 호출" }
-  php2shell-uprobe-popen-observe:         { level: high, sigma: "php2shell · uprobe(libc) · popen/system" }
-  php2shell-kprobe-execve-observe:        { level: high, sigma: "php2shell · kprobe · apache가 /bin/sh 실행" }
-  log4shell-uprobe-forkandexec-observe:   { level: high, sigma: "log4shell · uprobe · JVM forkAndExec" }
-  log4shell-kprobe-execve-observe:        { level: high, sigma: "log4shell · kprobe · java → 셸 실행" }
-  log4shell-kprobe-execveat-observe:      { level: high, sigma: "log4shell · kprobe · execveat(memfd 실행 우회)" }
-  log4shell-kprobe-memfd-observe:         { level: high, sigma: "log4shell · kprobe · memfd_create(파일리스 실행 준비)" }
-  react2shell-uprobe-uvspawn-observe:     { level: high, sigma: "react2shell · uprobe · node uv_spawn" }
+  php2shell-uprobe-zifsystem-observe:     { level: high, sigma: "php2shell · uprobe · zif_system/php_exec 호출", mitre: [T1190, T1505.003, T1059.004] }
+  php2shell-uprobe-popen-observe:         { level: high, sigma: "php2shell · uprobe(libc) · popen/system", mitre: [T1190, T1505.003, T1059.004] }
+  php2shell-kprobe-execve-observe:        { level: high, sigma: "php2shell · kprobe · apache가 /bin/sh 실행", mitre: [T1190, T1505.003, T1059.004] }
+  log4shell-uprobe-forkandexec-observe:   { level: high, sigma: "log4shell · uprobe · JVM forkAndExec", mitre: [T1190, T1059.004] }
+  log4shell-kprobe-execve-observe:        { level: high, sigma: "log4shell · kprobe · java → 셸 실행", mitre: [T1190, T1059.004] }
+  log4shell-kprobe-execveat-observe:      { level: high, sigma: "log4shell · kprobe · execveat(memfd 실행 우회)", mitre: [T1190, T1620] }
+  log4shell-kprobe-memfd-observe:         { level: high, sigma: "log4shell · kprobe · memfd_create(파일리스 실행 준비)", mitre: [T1190, T1620] }
+  react2shell-uprobe-uvspawn-observe:     { level: high, sigma: "react2shell · uprobe · node uv_spawn", mitre: [T1190, T1059.004] }
 
   # ── medium: 정황·전조 (상관분석 필요)
-  log4shell-kprobe-fileperm-observe:      { level: medium, sigma: "log4shell · kprobe · java의 /tmp 쓰기" }
-  log4shell-kprobe-tcpconnect-observe:    { level: medium, sigma: "log4shell · kprobe · java 아웃바운드 연결" }
+  log4shell-kprobe-fileperm-observe:      { level: medium, sigma: "log4shell · kprobe · java의 /tmp 쓰기", mitre: [T1105] }
+  log4shell-kprobe-tcpconnect-observe:    { level: medium, sigma: "log4shell · kprobe · java 아웃바운드 연결", mitre: [T1071] }
 
   # ── low: 광범위 관측 (연구용, 상시 운영 아님)
-  react2shell-kprobe-processflow-observe: { level: low, sigma: "react2shell · kprobe · clone/clone3/execve 전반" }
+  react2shell-kprobe-processflow-observe: { level: low, sigma: "react2shell · kprobe · clone/clone3/execve 전반", mitre: [T1059] }
 
 # Cilium 정책은 Tetragon 로그에 나오지 않는다. Hubble 차단 흐름 연결(④ 인프라) 때 쓴다. 지금 백엔드는 이 절을 읽지 않는다.
 cilium:
   log4shell-egress-block:                 { level: critical, sigma: "log4shell · egress · 아웃바운드 전면 차단" }
 
-# Falco 룰: 표 없음 → priority 기준 기본값 (Critical 이상 critical, Error high, Warning medium, Notice low)
-falco: {}
+# Falco 룰: 단계는 priority 기준 기본값 (Critical 이상 critical, Error high, Warning medium, Notice low)
+# mitre는 경보 tags의 T 번호(Falco 기본 룰)를 먼저 쓰고, 태그가 없는 커스텀 룰만 아래 값을 쓴다
+falco:
+  Shell Spawned in Vuln Lab:              { mitre: [T1059.004] }
+  Recon Tool in Vuln Lab:                 { mitre: [T1082] }
+  Outbound Connection from Vuln Lab:      { mitre: [T1071] }
+
+# 기법 이름 (② 사건 상세, AI 결과와 비교용)
+mitre_names:
+  T1190: Exploit Public-Facing Application
+  T1505.003: Web Shell
+  T1059: Command and Scripting Interpreter
+  T1059.004: Unix Shell
+  T1620: Reflective Code Loading
+  T1105: Ingress Tool Transfer
+  T1071: Application Layer Protocol
+  T1082: System Information Discovery

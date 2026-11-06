@@ -5,7 +5,7 @@ import logging
 from app import flow
 from app.config import Settings
 from app.incidents import correlate
-from app.incidents.levels import SigmaLevels, highest
+from app.incidents.levels import SigmaLevels, highest, merge_mitre
 from app.incidents.store import Incident, IncidentStore, Member
 from app.incidents.tempo import (
     TempoClient,
@@ -126,6 +126,9 @@ async def save_cluster(
         cands.append((levels.tetragon(p), f"tetragon:{p}"))
     if cands:
         inc.level, inc.level_source = highest(cands)
+    # MITRE: 걸린 정책들의 기법을 합친다 (sigma_levels.yaml의 mitre)
+    policies = [*anchor_policies, *sorted({e.policy for e in mem if e.policy} - set(anchor_policies))]
+    inc.mitre = merge_mitre(inc.mitre, *(levels.mitre_tetragon(p) for p in policies))
 
     binaries = [e.process.binary for e in mem] + [e.parent.binary for e in mem if e.parent]
     binaries += [e.parent.binary for e in window if e.parent and e.process.exec_id in ids]

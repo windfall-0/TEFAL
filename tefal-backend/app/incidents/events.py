@@ -30,6 +30,7 @@ async def incident_events(store: IncidentStore, loki, settings: Settings, inc: I
 
 
 BACKFILL_KEY = "layers_backfill_v1"
+MITRE_BACKFILL_KEY = "mitre_backfill_v1"
 
 
 async def backfill_layers(store: IncidentStore, loki, settings: Settings, lock) -> int:
@@ -64,4 +65,31 @@ async def backfill_layers(store: IncidentStore, loki, settings: Settings, lock) 
         await store.set_state(BACKFILL_KEY, str(done))
         await store.commit()
     log.info("계층 채우기: 지난 사건 %d건 완료", done)
+    return done
+
+
+async def backfill_mitre(store: IncidentStore, levels, lock) -> int:
+    """MITRE가 비어 있는 지난 사건을 한 번 채운다. 저장된 정책·규칙 이름에 표를 적용하므로 Loki를 읽지 않는다.
+    (웹훅 tags는 저장하지 않았으므로 지난 Falco 사건은 표의 falco 절만 쓴다.)"""
+    import logging
+
+    from app.core.params import CommonFilters
+
+    log = logging.getLogger(__name__)
+    async with lock:
+        if await store.get_state(MITRE_BACKFILL_KEY):
+            return 0
+        done = 0
+        for inc in await store.query(CommonFilters(0, 2**62, None, None, None)):
+            if inc.mitre:
+                continue
+            policies = [inc.policy, *(v for k, v in inc.layer_policies.items() if k != "falco")]
+            ids = levels.mitre_of([p for p in policies if p], inc.falco_rules)
+            if ids:
+                inc.mitre = ids
+                await store.save(inc)
+                done += 1
+        await store.set_state(MITRE_BACKFILL_KEY, str(done))
+        await store.commit()
+    log.info("MITRE 채우기: 지난 사건 %d건 완료", done)
     return done

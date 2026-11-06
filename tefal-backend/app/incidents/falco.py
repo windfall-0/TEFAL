@@ -6,7 +6,13 @@ from app import flow
 from app.config import Settings
 from app.incidents import correlate
 from app.incidents.builder import log_incident
-from app.incidents.levels import SigmaLevels, falco_priority_rank, highest
+from app.incidents.levels import (
+    SigmaLevels,
+    falco_priority_rank,
+    highest,
+    merge_mitre,
+    mitre_from_tags,
+)
 from app.incidents.store import Incident, IncidentStore, Member
 from app.incidents.tempo import TempoClient, export_new, falco_span, link_of, root_span
 from app.incidents.tetragon import parse_time_ns
@@ -90,6 +96,8 @@ async def ingest_falco(
         )
 
     flow.add_falco(inc, rule)  # ① 계층별 방어 흐름 (flow.py)
+    # MITRE: 경보 tags의 T 번호, 없으면 표의 falco 절 (커스텀 룰)
+    inc.mitre = merge_mitre(inc.mitre, mitre_from_tags(body.get("tags")) or levels.mitre_falco(rule))
     await store.save(inc)
     await store.add_members(inc.trace_id, falco_members)
     await store.record_falco(uuid, inc.trace_id)

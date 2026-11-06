@@ -84,18 +84,6 @@
       "asDropdown": false,
       "tags": [],
       "tooltip": ""
-    },
-    {
-      "title": "Headlamp",
-      "type": "link",
-      "url": "${headlamp_url}",
-      "icon": "external link",
-      "keepTime": false,
-      "includeVars": false,
-      "targetBlank": true,
-      "asDropdown": false,
-      "tags": [],
-      "tooltip": ""
     }
   ],
   "templating": {
@@ -121,18 +109,6 @@
         "current": {
           "text": "http://192.168.0.200:31235",
           "value": "http://192.168.0.200:31235"
-        },
-        "options": []
-      },
-      {
-        "type": "constant",
-        "name": "headlamp_url",
-        "label": "Headlamp URL",
-        "hide": 2,
-        "query": "http://192.168.0.200:31240",
-        "current": {
-          "text": "http://192.168.0.200:31240",
-          "value": "http://192.168.0.200:31240"
         },
         "options": []
       }
@@ -1224,7 +1200,7 @@
       "gridPos": {
         "x": 0,
         "y": 21,
-        "w": 12,
+        "w": 24,
         "h": 7
       },
       "datasource": {
@@ -1375,26 +1351,6 @@
           }
         }
       ]
-    },
-    {
-      "id": 10,
-      "type": "text",
-      "title": "관리 도구",
-      "description": "",
-      "gridPos": {
-        "x": 12,
-        "y": 21,
-        "w": 12,
-        "h": 7
-      },
-      "options": {
-        "mode": "html",
-        "content": "<div style=\"display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px\"><a href=\"${hubble_url}\" target=\"_blank\" style=\"border:1px solid #5794F2;border-radius:4px;padding:6px 12px;color:#5794F2\">Hubble UI · 서비스 맵 ↗</a><a href=\"${headlamp_url}\" target=\"_blank\" style=\"border:1px solid #5794F2;border-radius:4px;padding:6px 12px;color:#5794F2\">Headlamp · 격리·재시작 ↗</a></div><p style=\"opacity:0.75\">Grafana는 조회 전용입니다. 조작은 별도 로그인과 최소 권한이 걸린 Headlamp에서만 합니다.</p>"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      }
     }
   ]
 }

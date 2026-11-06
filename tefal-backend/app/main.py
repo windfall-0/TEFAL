@@ -21,7 +21,7 @@ from app.core.metrics import install_metrics_middleware
 from app.hubble.client import HubbleClient
 from app.incidents.collector import Collector, LokiClient
 from app.incidents.detections import DetectionCollector
-from app.incidents.events import backfill_layers
+from app.incidents.events import backfill_layers, backfill_mitre
 from app.incidents.levels import SigmaLevels
 from app.incidents.store import IncidentStore
 from app.incidents.tempo import TempoClient
@@ -61,6 +61,8 @@ async def lifespan(app: FastAPI):
     app.state.ai = AiService(settings, app.state.cache, app.state.incidents, loki, gemini, app.state.ti,
                              app.state.sigma_levels)
     task = None
+    # 사건 큐 MITRE: 지난 사건을 매칭 표로 한 번 채운다 (수집기와 상관없이, Loki 없이)
+    await backfill_mitre(app.state.incidents, app.state.sigma_levels, app.state.incidents_lock)
     if settings.collector_enabled:
         collector = Collector(
             settings,
